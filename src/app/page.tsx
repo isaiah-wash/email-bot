@@ -1,65 +1,181 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useSession, signIn } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
+
+export default function LandingPage() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (session) router.replace("/dashboard");
+  }, [session, router]);
+
+  if (status === "loading" || session) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-zinc-950">
+        <div className="h-5 w-5 rounded-full border-2 border-zinc-700 border-t-zinc-300 animate-spin" />
+      </div>
+    );
+  }
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="fixed inset-0 flex flex-col bg-zinc-950 overflow-auto">
+      {/* Background grid */}
+      <div
+        className="pointer-events-none absolute inset-0 opacity-[0.03]"
+        style={{
+          backgroundImage: `
+            linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)
+          `,
+          backgroundSize: "64px 64px",
+        }}
+      />
+
+      {/* Radial glow */}
+      <div
+        className="pointer-events-none absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[600px] opacity-20"
+        style={{
+          background:
+            "radial-gradient(ellipse at center, rgba(161,161,170,0.3) 0%, transparent 70%)",
+        }}
+      />
+
+      <div className="relative flex flex-1 flex-col items-center justify-center px-6 py-16">
+        {/* Logo mark */}
+        <div className="mb-10 flex items-center gap-3">
+          <div className="relative flex h-10 w-10 items-center justify-center">
+            <div className="absolute inset-0 rounded-lg bg-zinc-800 rotate-3" />
+            <div className="absolute inset-0 rounded-lg bg-zinc-700 -rotate-2" />
+            <div className="relative rounded-lg bg-zinc-100 h-full w-full flex items-center justify-center">
+              <svg
+                width="20"
+                height="16"
+                viewBox="0 0 20 16"
+                fill="none"
+                className="text-zinc-900"
+              >
+                <path
+                  d="M1 3L10 9L19 3"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <rect
+                  x="1"
+                  y="1"
+                  width="18"
+                  height="14"
+                  rx="2"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                />
+              </svg>
+            </div>
+          </div>
+          <span className="text-xl font-semibold text-zinc-100 tracking-tight font-[family-name:var(--font-geist-sans)]">
+            EmailBot
+          </span>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+
+        {/* Headline */}
+        <h1 className="max-w-lg text-center text-[2.5rem] leading-[1.1] font-bold tracking-tight text-zinc-100 font-[family-name:var(--font-geist-sans)] sm:text-5xl">
+          Outreach that
+          <br />
+          <span className="text-zinc-500">feels personal</span>
+        </h1>
+
+        <p className="mt-5 max-w-md text-center text-base leading-relaxed text-zinc-400 font-[family-name:var(--font-geist-sans)]">
+          Connect your Gmail, enrich contacts from LinkedIn, and let AI draft
+          emails your recipients actually want to read.
+        </p>
+
+        {/* Sign in button */}
+        <button
+          onClick={() => signIn("google")}
+          className="group mt-10 flex items-center gap-3 rounded-full bg-zinc-100 px-6 py-3 text-sm font-medium text-zinc-900 transition-all hover:bg-white hover:shadow-[0_0_32px_rgba(255,255,255,0.15)] active:scale-[0.98]"
+        >
+          <svg width="18" height="18" viewBox="0 0 18 18" className="shrink-0">
+            <path
+              d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 01-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"
+              fill="#4285F4"
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+            <path
+              d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z"
+              fill="#34A853"
+            />
+            <path
+              d="M3.964 10.71A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.997 8.997 0 000 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"
+              fill="#FBBC05"
+            />
+            <path
+              d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"
+              fill="#EA4335"
+            />
+          </svg>
+          <span>Sign in with Google</span>
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 14 14"
+            fill="none"
+            className="opacity-40 transition-all group-hover:opacity-70 group-hover:translate-x-0.5"
           >
-            Documentation
-          </a>
+            <path
+              d="M5.25 3.5L8.75 7L5.25 10.5"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
+
+        {/* Feature pills */}
+        <div className="mt-16 flex flex-wrap items-center justify-center gap-3">
+          {[
+            {
+              label: "Gmail Integration",
+              detail: "Send & track from your inbox",
+            },
+            {
+              label: "LinkedIn Enrichment",
+              detail: "Auto-fill contact profiles",
+            },
+            {
+              label: "AI-Powered Drafts",
+              detail: "Personalized by Claude",
+            },
+          ].map((feature) => (
+            <div
+              key={feature.label}
+              className="group flex items-center gap-3 rounded-xl border border-zinc-800 bg-zinc-900/60 px-5 py-3.5 backdrop-blur-sm transition-colors hover:border-zinc-700"
+            >
+              <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 opacity-80" />
+              <div>
+                <div className="text-sm font-medium text-zinc-200 font-[family-name:var(--font-geist-sans)]">
+                  {feature.label}
+                </div>
+                <div className="text-xs text-zinc-500 font-[family-name:var(--font-geist-sans)]">
+                  {feature.detail}
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
-      </main>
+
+        {/* Bottom details */}
+        <div className="mt-16 flex items-center gap-6 text-xs text-zinc-600 font-[family-name:var(--font-geist-mono)]">
+          <span>Local-first</span>
+          <span className="h-3 w-px bg-zinc-800" />
+          <span>You review every email</span>
+          <span className="h-3 w-px bg-zinc-800" />
+          <span>Your data stays yours</span>
+        </div>
+      </div>
     </div>
   );
 }

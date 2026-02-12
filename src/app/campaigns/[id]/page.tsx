@@ -1,0 +1,205 @@
+"use client";
+
+import { useSession } from "next-auth/react";
+import { useRouter, useParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import Link from "next/link";
+
+interface Campaign {
+  id: string;
+  name: string;
+  description: string | null;
+  context: string | null;
+  status: string;
+  template: { id: string; name: string } | null;
+  contacts: {
+    id: string;
+    status: string;
+    contact: {
+      id: string;
+      email: string | null;
+      firstName: string | null;
+      lastName: string | null;
+      company: string | null;
+    };
+    drafts: {
+      id: string;
+      subject: string;
+      status: string;
+      sentEmail: { sentAt: string } | null;
+    }[];
+  }[];
+}
+
+export default function CampaignDetailPage() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
+  const params = useParams();
+  const campaignId = params.id as string;
+
+  const [campaign, setCampaign] = useState<Campaign | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
+
+  useEffect(() => {
+    if (status === "unauthenticated") router.replace("/");
+  }, [status, router]);
+
+  useEffect(() => {
+    if (!session) return;
+    fetchCampaign();
+  }, [session, campaignId]);
+
+  async function fetchCampaign() {
+    const res = await fetch(`/api/campaigns/${campaignId}`);
+    if (!res.ok) {
+      router.replace("/campaigns");
+      return;
+    }
+    setCampaign(await res.json());
+    setLoading(false);
+  }
+
+  async function handleGenerate() {
+    setGenerating(true);
+    const res = await fetch(`/api/campaigns/${campaignId}/generate`, {
+      method: "POST",
+    });
+    if (res.ok) {
+      fetchCampaign();
+    }
+    setGenerating(false);
+  }
+
+  async function handleDelete() {
+    if (!confirm("Delete this campaign?")) return;
+    await fetch(`/api/campaigns/${campaignId}`, { method: "DELETE" });
+    router.replace("/campaigns");
+  }
+
+  if (status === "loading" || loading || !session) {
+    return (
+      <div className="flex h-[80vh] items-center justify-center">
+        <div className="h-5 w-5 rounded-full border-2 border-zinc-300 border-t-zinc-600 animate-spin" />
+      </div>
+    );
+  }
+
+  if (!campaign) return null;
+
+  const pendingCount = campaign.contacts.filter((c) => c.status === "PENDING").length;
+  const draftReadyCount = campaign.contacts.filter((c) => c.status === "DRAFT_READY").length;
+  const sentCount = campaign.contacts.filter((c) => c.status === "SENT").length;
+
+  return (
+    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      <Link href="/campaigns" className="text-sm text-zinc-500 hover:text-zinc-900 mb-4 inline-block">
+        &larr; Back to campaigns
+      </Link>
+
+      <div className="flex items-start justify-between mb-6">
+        <div>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-semibold tracking-tight">{campaign.name}</h1>
+            <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
+              campaign.status === "COMPLETED" ? "bg-emerald-50 text-emerald-700" :
+              campaign.status === "ACTIVE" ? "bg-blue-50 text-blue-700" :
+              "bg-zinc-100 text-zinc-600"
+            }`}>
+              {campaign.status}
+            </span>
+          </div>
+          {campaign.description && (
+            <p className="mt-1 text-sm text-zinc-500">{campaign.description}</p>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {pendingCount > 0 && campaign.template && (
+            <button
+              onClick={handleGenerate}
+              disabled={generating}
+              className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
+            >
+              {generating ? "Generating..." : `Generate Drafts (${pendingCount})`}
+            </button>
+          )}
+          <button
+            onClick={handleDelete}
+            className="rounded-lg border border-red-200 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-3 gap-4 mb-6">
+        <div className="rounded-xl border border-zinc-200 bg-white p-4 text-center">
+          <div className="text-2xl font-semibold">{pendingCount}</div>
+          <div className="text-xs text-zinc-500 mt-0.5">Pending</div>
+        </div>
+        <div className="rounded-xl border border-zinc-200 bg-white p-4 text-center">
+          <div className="text-2xl font-semibold">{draftReadyCount}</div>
+          <div className="text-xs text-zinc-500 mt-0.5">Drafts Ready</div>
+        </div>
+        <div className="rounded-xl border border-zinc-200 bg-white p-4 text-center">
+          <div className="text-2xl font-semibold">{sentCount}</div>
+          <div className="text-xs text-zinc-500 mt-0.5">Sent</div>
+        </div>
+      </div>
+
+      {campaign.context && (
+        <div className="rounded-xl border border-zinc-200 bg-white p-5 mb-6">
+          <h2 className="text-sm font-semibold mb-2">Campaign Context</h2>
+          <p className="text-sm text-zinc-600 whitespace-pre-wrap">{campaign.context}</p>
+        </div>
+      )}
+
+      {/* Contacts table */}
+      <div className="rounded-xl border border-zinc-200 bg-white">
+        <div className="border-b border-zinc-100 px-5 py-4">
+          <h2 className="text-sm font-semibold">
+            Contacts ({campaign.contacts.length})
+          </h2>
+        </div>
+        <div className="divide-y divide-zinc-100">
+          {campaign.contacts.map((cc) => {
+            const name = [cc.contact.firstName, cc.contact.lastName].filter(Boolean).join(" ") || "Unnamed";
+            const latestDraft = cc.drafts[0];
+
+            return (
+              <div key={cc.id} className="flex items-center justify-between px-5 py-4">
+                <div className="min-w-0">
+                  <Link href={`/contacts/${cc.contact.id}`} className="text-sm font-medium hover:underline">
+                    {name}
+                  </Link>
+                  <div className="text-xs text-zinc-500 mt-0.5">
+                    {cc.contact.email || "No email"} {cc.contact.company && `· ${cc.contact.company}`}
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 shrink-0 ml-4">
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                    cc.status === "SENT" ? "bg-emerald-50 text-emerald-700" :
+                    cc.status === "APPROVED" ? "bg-blue-50 text-blue-700" :
+                    cc.status === "DRAFT_READY" ? "bg-amber-50 text-amber-700" :
+                    "bg-zinc-100 text-zinc-600"
+                  }`}>
+                    {cc.status.replace("_", " ")}
+                  </span>
+                  {latestDraft && (
+                    <Link
+                      href={`/compose/${latestDraft.id}`}
+                      className="text-xs text-blue-600 hover:underline"
+                    >
+                      {latestDraft.status === "SENT" ? "View" : "Review"}
+                    </Link>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
