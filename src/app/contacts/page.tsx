@@ -66,6 +66,8 @@ function mapCsvRow(row: Record<string, string>) {
     row["firstname"] || row["first"] || row["fname"] || row["givenname"] || "";
   const lastName =
     row["lastname"] || row["last"] || row["lname"] || row["surname"] || row["familyname"] || "";
+  const linkedinUrl =
+    row["linkedinurl"] || row["linkedin"] || row["linkedinprofile"] || row["profileurl"] || "";
 
   // Handle "name" or "fullname" columns by splitting
   if (!firstName && !lastName) {
@@ -76,11 +78,12 @@ function mapCsvRow(row: Record<string, string>) {
         email,
         firstName: parts[0] || "",
         lastName: parts.slice(1).join(" ") || "",
+        linkedinUrl,
       };
     }
   }
 
-  return { email, firstName, lastName };
+  return { email, firstName, lastName, linkedinUrl };
 }
 
 export default function ContactsPage() {

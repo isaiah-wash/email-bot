@@ -6,6 +6,7 @@ interface CsvContact {
   firstName: string;
   lastName: string;
   email: string;
+  linkedinUrl: string;
 }
 
 export async function POST(req: NextRequest) {
@@ -36,20 +37,22 @@ export async function POST(req: NextRequest) {
   }
 
   // Validate and normalize
-  const valid: { email: string; firstName: string | null; lastName: string | null }[] = [];
+  const valid: { email: string | null; linkedinUrl: string | null; firstName: string | null; lastName: string | null }[] = [];
   const errors: string[] = [];
 
   for (let i = 0; i < contacts.length; i++) {
     const c = contacts[i];
-    const email = (c.email ?? "").trim().toLowerCase();
+    const email = (c.email ?? "").trim().toLowerCase() || null;
+    const linkedinUrl = (c.linkedinUrl ?? "").trim() || null;
 
-    if (!email || !email.includes("@")) {
-      errors.push(`Row ${i + 1}: invalid or missing email "${c.email ?? ""}"`);
+    if ((!email || !email.includes("@")) && !linkedinUrl) {
+      errors.push(`Row ${i + 1}: must have a valid email or LinkedIn URL`);
       continue;
     }
 
     valid.push({
-      email,
+      email: email && email.includes("@") ? email : null,
+      linkedinUrl,
       firstName: (c.firstName ?? "").trim() || null,
       lastName: (c.lastName ?? "").trim() || null,
     });
@@ -67,6 +70,7 @@ export async function POST(req: NextRequest) {
     data: valid.map((c) => ({
       userId: user.id,
       email: c.email,
+      linkedinUrl: c.linkedinUrl,
       firstName: c.firstName,
       lastName: c.lastName,
     })),
