@@ -27,7 +27,7 @@ export function Nav() {
               href="/dashboard"
               className="text-lg font-semibold text-zinc-900 tracking-tight"
             >
-              EmailBot
+              EmailBotemis
             </Link>
             <div className="flex items-center gap-1">
               {navItems.map((item) => {

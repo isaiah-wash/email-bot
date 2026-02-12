@@ -77,7 +77,7 @@ export default function LandingPage() {
             </div>
           </div>
           <span className="text-xl font-semibold text-zinc-100 tracking-tight font-[family-name:var(--font-geist-sans)]">
-            EmailBot
+            EmailBotemis
           </span>
         </div>
 

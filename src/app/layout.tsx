@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "EmailBot — Personalized Email Outreach",
+  title: "EmailBotemis — Personalized Email Outreach",
   description: "Automate personalized email outreach with AI-powered drafts",
 };
 

@@ -2,7 +2,7 @@
 
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 
 interface Contact {
@@ -16,6 +16,71 @@ interface Contact {
   enrichedAt: string | null;
   createdAt: string;
   _count: { emailDrafts: number };
+}
+
+function parseCsv(text: string): Record<string, string>[] {
+  const lines = text.split(/\r?\n/).filter((l) => l.trim());
+  if (lines.length < 2) return [];
+
+  // Parse header — handle quoted fields
+  const parseRow = (row: string): string[] => {
+    const fields: string[] = [];
+    let current = "";
+    let inQuotes = false;
+    for (let i = 0; i < row.length; i++) {
+      const ch = row[i];
+      if (ch === '"') {
+        if (inQuotes && row[i + 1] === '"') {
+          current += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (ch === "," && !inQuotes) {
+        fields.push(current.trim());
+        current = "";
+      } else {
+        current += ch;
+      }
+    }
+    fields.push(current.trim());
+    return fields;
+  };
+
+  const headers = parseRow(lines[0]).map((h) => h.toLowerCase().replace(/[^a-z0-9]/g, ""));
+  return lines.slice(1).map((line) => {
+    const values = parseRow(line);
+    const obj: Record<string, string> = {};
+    headers.forEach((h, i) => {
+      obj[h] = values[i] ?? "";
+    });
+    return obj;
+  });
+}
+
+function mapCsvRow(row: Record<string, string>) {
+  // Support common column name variants
+  const email =
+    row["email"] || row["emailaddress"] || row["mail"] || "";
+  const firstName =
+    row["firstname"] || row["first"] || row["fname"] || row["givenname"] || "";
+  const lastName =
+    row["lastname"] || row["last"] || row["lname"] || row["surname"] || row["familyname"] || "";
+
+  // Handle "name" or "fullname" columns by splitting
+  if (!firstName && !lastName) {
+    const fullName = row["name"] || row["fullname"] || row["contactname"] || "";
+    if (fullName) {
+      const parts = fullName.trim().split(/\s+/);
+      return {
+        email,
+        firstName: parts[0] || "",
+        lastName: parts.slice(1).join(" ") || "",
+      };
+    }
+  }
+
+  return { email, firstName, lastName };
 }
 
 export default function ContactsPage() {
@@ -33,6 +98,15 @@ export default function ContactsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  // CSV import state
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<{
+    imported: number;
+    skipped: number;
+    errors: string[];
+  } | null>(null);
 
   useEffect(() => {
     if (status === "unauthenticated") router.replace("/");
@@ -84,6 +158,49 @@ export default function ContactsPage() {
     fetchContacts(search);
   }
 
+  async function handleCsvImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImporting(true);
+    setImportResult(null);
+    setError("");
+
+    try {
+      const text = await file.text();
+      const rows = parseCsv(text);
+
+      if (rows.length === 0) {
+        setError("CSV file is empty or has no data rows");
+        setImporting(false);
+        return;
+      }
+
+      const contacts = rows.map(mapCsvRow);
+
+      const res = await fetch("/api/contacts/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contacts }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        setImportResult(data);
+        fetchContacts();
+      } else {
+        setError(data.error || "Import failed");
+      }
+    } catch {
+      setError("Failed to read or parse CSV file");
+    }
+
+    setImporting(false);
+    // Reset the file input so the same file can be re-selected
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
   if (status === "loading" || !session) {
     return (
       <div className="flex h-[80vh] items-center justify-center">
@@ -99,13 +216,60 @@ export default function ContactsPage() {
           <h1 className="text-2xl font-semibold tracking-tight">Contacts</h1>
           <p className="mt-1 text-sm text-zinc-500">{contacts.length} contacts in your directory</p>
         </div>
-        <button
-          onClick={() => setShowForm(!showForm)}
-          className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 transition-colors"
-        >
-          {showForm ? "Cancel" : "Add Contact"}
-        </button>
+        <div className="flex items-center gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv"
+            onChange={handleCsvImport}
+            className="hidden"
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={importing}
+            className="rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition-colors disabled:opacity-50"
+          >
+            {importing ? "Importing..." : "Import CSV"}
+          </button>
+          <button
+            onClick={() => setShowForm(!showForm)}
+            className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 transition-colors"
+          >
+            {showForm ? "Cancel" : "Add Contact"}
+          </button>
+        </div>
       </div>
+
+      {importResult && (
+        <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-emerald-800">
+              <span className="font-medium">{importResult.imported}</span> contact{importResult.imported !== 1 ? "s" : ""} imported
+              {importResult.skipped > 0 && (
+                <span className="ml-2 text-zinc-500">
+                  ({importResult.skipped} skipped as duplicates)
+                </span>
+              )}
+            </div>
+            <button
+              onClick={() => setImportResult(null)}
+              className="text-emerald-600 hover:text-emerald-800 text-sm"
+            >
+              Dismiss
+            </button>
+          </div>
+          {importResult.errors.length > 0 && (
+            <div className="mt-2 text-xs text-amber-700">
+              {importResult.errors.slice(0, 5).map((err, i) => (
+                <p key={i}>{err}</p>
+              ))}
+              {importResult.errors.length > 5 && (
+                <p>...and {importResult.errors.length - 5} more</p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {showForm && (
         <form onSubmit={handleCreate} className="mb-6 rounded-xl border border-zinc-200 bg-white p-5">
