@@ -274,6 +274,18 @@ export default function ContactsPage() {
         </div>
       )}
 
+      {error && (
+        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 flex items-center justify-between">
+          <p className="text-sm text-red-700">{error}</p>
+          <button
+            onClick={() => setError("")}
+            className="text-red-500 hover:text-red-700 text-sm"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {showForm && (
         <form onSubmit={handleCreate} className="mb-6 rounded-xl border border-zinc-200 bg-white p-5">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -318,7 +330,6 @@ export default function ContactsPage() {
               />
             </div>
           </div>
-          {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
           <div className="mt-4 flex justify-end">
             <button
               type="submit"
