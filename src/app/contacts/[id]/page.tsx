@@ -50,6 +50,7 @@ export default function ContactDetailPage() {
   const [templates, setTemplates] = useState<{ id: string; name: string }[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState("");
   const [showGenerate, setShowGenerate] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (status === "unauthenticated") router.replace("/");
@@ -88,9 +89,17 @@ export default function ContactDetailPage() {
 
   async function handleEnrich() {
     setEnriching(true);
-    const res = await fetch(`/api/contacts/${contactId}/enrich`, { method: "POST" });
-    if (res.ok) {
-      fetchContact();
+    setError("");
+    try {
+      const res = await fetch(`/api/contacts/${contactId}/enrich`, { method: "POST" });
+      if (res.ok) {
+        fetchContact();
+      } else {
+        const data = await res.json();
+        setError(data.error || "Enrichment failed");
+      }
+    } catch {
+      setError("Failed to connect to enrichment service");
     }
     setEnriching(false);
   }
@@ -135,6 +144,18 @@ export default function ContactDetailPage() {
         &larr; Back to contacts
       </Link>
 
+      {error && (
+        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 flex items-center justify-between">
+          <p className="text-sm text-red-700">{error}</p>
+          <button
+            onClick={() => setError("")}
+            className="text-red-500 hover:text-red-700 text-sm"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Main Info */}
         <div className="lg:col-span-2 space-y-6">
@@ -147,13 +168,13 @@ export default function ContactDetailPage() {
                 )}
               </div>
               <div className="flex items-center gap-2">
-                {contact.linkedinUrl && !contact.enrichedAt && (
+                {contact.linkedinUrl && (
                   <button
                     onClick={handleEnrich}
                     disabled={enriching}
                     className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
                   >
-                    {enriching ? "Enriching..." : "Enrich from LinkedIn"}
+                    {enriching ? "Enriching..." : contact.enrichedAt ? "Re-enrich from LinkedIn" : "Enrich from LinkedIn"}
                   </button>
                 )}
                 <button

@@ -40,25 +40,23 @@ export async function POST(
       enrichedAt: new Date(),
     };
 
-    // Fill in missing fields from profile
-    if (!contact.firstName && profile.first_name) {
-      updateData.firstName = profile.first_name;
+    // Fill in missing name and email from profile
+    if (!contact.firstName && profile.firstName) {
+      updateData.firstName = profile.firstName;
     }
-    if (!contact.lastName && profile.last_name) {
-      updateData.lastName = profile.last_name;
+    if (!contact.lastName && profile.lastName) {
+      updateData.lastName = profile.lastName;
     }
     if (!contact.email) {
       const email = extractEmailFromProfile(profile);
       if (email) updateData.email = email;
     }
-    if (!contact.company) {
-      const company = extractCompanyFromProfile(profile);
-      if (company) updateData.company = company;
-    }
-    if (!contact.title) {
-      const title = extractTitleFromProfile(profile);
-      if (title) updateData.title = title;
-    }
+
+    // Always update company and title to reflect current LinkedIn profile
+    const company = extractCompanyFromProfile(profile);
+    if (company) updateData.company = company;
+    const title = extractTitleFromProfile(profile);
+    if (title) updateData.title = title;
 
     const updated = await prisma.contact.update({
       where: { id },

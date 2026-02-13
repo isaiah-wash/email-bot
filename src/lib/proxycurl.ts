@@ -1,30 +1,38 @@
-const PROXYCURL_BASE = "https://nubela.co/proxycurl/api/v2";
+const SCRAPIN_BASE = "https://api.scrapin.io/v1/enrichment";
 
 export interface LinkedInProfile {
-  public_identifier: string;
-  first_name: string;
-  last_name: string;
-  full_name: string;
+  publicIdentifier: string;
+  firstName: string;
+  lastName: string;
   headline: string;
-  summary: string;
-  country: string;
-  city: string;
-  experiences: {
+  summary: string | null;
+  location: {
+    city: string;
+    state: string;
+    country: string;
+    countryCode: string;
+  } | null;
+  currentPosition: {
     title: string;
-    company: string;
+    companyName: string;
     description: string;
-    starts_at: { day: number; month: number; year: number } | null;
-    ends_at: { day: number; month: number; year: number } | null;
-  }[];
-  education: {
-    school: string;
-    degree_name: string;
-    field_of_study: string;
-    starts_at: { day: number; month: number; year: number } | null;
-    ends_at: { day: number; month: number; year: number } | null;
-  }[];
-  personal_emails: string[];
-  work_email: string | null;
+    startEndDate: {
+      start: { month: number; year: number } | null;
+      end: { month: number; year: number } | null;
+    } | null;
+  } | null;
+  positions: {
+    positionsCount: number;
+    positionHistory: {
+      title: string;
+      companyName: string;
+      description: string;
+      startEndDate: {
+        start: { month: number; year: number } | null;
+        end: { month: number; year: number } | null;
+      } | null;
+    }[];
+  } | null;
   [key: string]: unknown;
 }
 
@@ -33,9 +41,7 @@ function normalizeLinkedInUrl(url: string): string {
   if (!cleaned.startsWith("http")) {
     cleaned = "https://" + cleaned;
   }
-  // Remove trailing slash
   cleaned = cleaned.replace(/\/$/, "");
-  // Ensure it's a linkedin.com URL
   if (!cleaned.includes("linkedin.com/in/")) {
     throw new Error("Invalid LinkedIn profile URL");
   }
@@ -45,48 +51,65 @@ function normalizeLinkedInUrl(url: string): string {
 export async function enrichFromLinkedIn(
   linkedinUrl: string
 ): Promise<LinkedInProfile> {
-  const apiKey = process.env.PROXYCURL_API_KEY;
+  const apiKey = process.env.SCRAPIN_API_KEY;
   if (!apiKey) {
-    throw new Error("PROXYCURL_API_KEY is not configured");
+    throw new Error("SCRAPIN_API_KEY is not configured — add it to .env.local");
   }
 
   const normalizedUrl = normalizeLinkedInUrl(linkedinUrl);
 
-  const response = await fetch(
-    `${PROXYCURL_BASE}/linkedin?url=${encodeURIComponent(normalizedUrl)}&use_cache=if-present`,
-    {
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
+  const response = await fetch(`${SCRAPIN_BASE}/profile`, {
+    method: "POST",
+    headers: {
+      "x-api-key": apiKey,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      linkedInUrl: normalizedUrl,
+      includes: {
+        includeCompany: true,
+        includeExperience: true,
       },
-    }
-  );
+    }),
+  });
 
   if (!response.ok) {
     const error = await response.text();
-    throw new Error(`Proxycurl API error (${response.status}): ${error}`);
+    throw new Error(`ScrapIn API error (${response.status}): ${error}`);
   }
 
-  return response.json();
+  const data = await response.json();
+
+  if (!data.success) {
+    throw new Error(data.msg || "ScrapIn enrichment failed");
+  }
+
+  return data.person;
 }
 
 export function extractEmailFromProfile(
-  profile: LinkedInProfile
+  _profile: LinkedInProfile
 ): string | null {
-  if (profile.work_email) return profile.work_email;
-  if (profile.personal_emails?.length > 0) return profile.personal_emails[0];
+  // ScrapIn profile endpoint does not return email
   return null;
 }
 
 export function extractCompanyFromProfile(
   profile: LinkedInProfile
 ): string | null {
-  const current = profile.experiences?.find((exp) => !exp.ends_at);
-  return current?.company ?? profile.experiences?.[0]?.company ?? null;
+  if (profile.currentPosition?.companyName) {
+    return profile.currentPosition.companyName;
+  }
+  const first = profile.positions?.positionHistory?.[0];
+  return first?.companyName ?? null;
 }
 
 export function extractTitleFromProfile(
   profile: LinkedInProfile
 ): string | null {
-  const current = profile.experiences?.find((exp) => !exp.ends_at);
-  return current?.title ?? profile.experiences?.[0]?.title ?? null;
+  if (profile.currentPosition?.title) {
+    return profile.currentPosition.title;
+  }
+  const first = profile.positions?.positionHistory?.[0];
+  return first?.title ?? null;
 }
