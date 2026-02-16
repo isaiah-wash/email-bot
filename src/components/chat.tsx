@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useChatContext } from "./chat-provider";
 
 interface Message {
   role: "user" | "assistant";
@@ -38,8 +39,7 @@ const TOOL_LABELS: Record<string, string> = {
 };
 
 export default function Chat() {
-  const [open, setOpen] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([]);
+  const { messages, setMessages, open, setOpen } = useChatContext();
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [toolActivity, setToolActivity] = useState<ToolActivity | null>(null);
