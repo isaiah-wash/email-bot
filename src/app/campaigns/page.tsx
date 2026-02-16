@@ -39,7 +39,7 @@ export default function CampaignsPage() {
   if (status === "loading" || !session) {
     return (
       <div className="flex h-[80vh] items-center justify-center">
-        <div className="h-5 w-5 rounded-full border-2 border-zinc-300 border-t-zinc-600 animate-spin" />
+        <div className="h-5 w-5 rounded-full border-2 border-brand-200 border-t-brand-500 animate-spin" />
       </div>
     );
   }
@@ -53,7 +53,7 @@ export default function CampaignsPage() {
         </div>
         <Link
           href="/campaigns/new"
-          className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 transition-colors"
+          className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 transition-colors"
         >
           New Campaign
         </Link>
@@ -61,10 +61,10 @@ export default function CampaignsPage() {
 
       {loading ? (
         <div className="flex h-40 items-center justify-center">
-          <div className="h-5 w-5 rounded-full border-2 border-zinc-300 border-t-zinc-600 animate-spin" />
+          <div className="h-5 w-5 rounded-full border-2 border-brand-200 border-t-brand-500 animate-spin" />
         </div>
       ) : campaigns.length === 0 ? (
-        <div className="rounded-xl border border-zinc-200 bg-white py-16 text-center">
+        <div className="rounded-xl border border-brand-100 bg-white py-16 text-center">
           <p className="text-zinc-500">No campaigns yet. Create your first campaign to start batch outreach.</p>
         </div>
       ) : (
@@ -73,12 +73,12 @@ export default function CampaignsPage() {
             <Link
               key={campaign.id}
               href={`/campaigns/${campaign.id}`}
-              className="rounded-xl border border-zinc-200 bg-white p-5 transition-shadow hover:shadow-md"
+              className="rounded-xl border border-brand-100 bg-white p-5 transition-shadow hover:shadow-md"
             >
               <div className="flex items-center justify-between mb-2">
                 <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                   campaign.status === "COMPLETED" ? "bg-emerald-50 text-emerald-700" :
-                  campaign.status === "ACTIVE" ? "bg-blue-50 text-blue-700" :
+                  campaign.status === "ACTIVE" ? "bg-brand-50 text-brand-600" :
                   "bg-zinc-100 text-zinc-600"
                 }`}>
                   {campaign.status}

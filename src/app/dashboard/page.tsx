@@ -50,14 +50,14 @@ export default function DashboardPage() {
   if (status === "loading" || !session) {
     return (
       <div className="flex h-[80vh] items-center justify-center">
-        <div className="h-5 w-5 rounded-full border-2 border-zinc-300 border-t-zinc-600 animate-spin" />
+        <div className="h-5 w-5 rounded-full border-2 border-brand-200 border-t-brand-500 animate-spin" />
       </div>
     );
   }
 
   const statCards = [
-    { label: "Contacts", value: stats.contacts, href: "/contacts", color: "bg-blue-50 text-blue-700" },
-    { label: "Campaigns", value: stats.campaigns, href: "/campaigns", color: "bg-purple-50 text-purple-700" },
+    { label: "Contacts", value: stats.contacts, href: "/contacts", color: "bg-brand-50 text-brand-600" },
+    { label: "Campaigns", value: stats.campaigns, href: "/campaigns", color: "bg-brand-100 text-brand-700" },
     { label: "Pending Drafts", value: stats.drafts, href: "/contacts", color: "bg-amber-50 text-amber-700" },
     { label: "Emails Sent", value: stats.sent, href: "/contacts", color: "bg-emerald-50 text-emerald-700" },
   ];
@@ -76,7 +76,7 @@ export default function DashboardPage() {
           <Link
             key={card.label}
             href={card.href}
-            className="rounded-xl border border-zinc-200 bg-white p-5 transition-shadow hover:shadow-md"
+            className="rounded-xl border border-brand-100 bg-white p-5 transition-shadow hover:shadow-md"
           >
             <div className="text-sm font-medium text-zinc-500">{card.label}</div>
             <div className="mt-2 text-3xl font-semibold tracking-tight">{card.value}</div>
@@ -86,14 +86,14 @@ export default function DashboardPage() {
 
       <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Recent Drafts */}
-        <div className="rounded-xl border border-zinc-200 bg-white">
-          <div className="flex items-center justify-between border-b border-zinc-100 px-5 py-4">
+        <div className="rounded-xl border border-brand-100 bg-white">
+          <div className="flex items-center justify-between border-b border-brand-50 px-5 py-4">
             <h2 className="text-sm font-semibold">Recent Drafts</h2>
-            <Link href="/contacts" className="text-xs text-zinc-500 hover:text-zinc-900">
+            <Link href="/contacts" className="text-xs text-brand-500 hover:text-brand-700">
               View all
             </Link>
           </div>
-          <div className="divide-y divide-zinc-100">
+          <div className="divide-y divide-brand-50">
             {recentDrafts.length === 0 ? (
               <div className="px-5 py-8 text-center text-sm text-zinc-400">
                 No drafts yet. Create a contact and generate your first email.
@@ -103,7 +103,7 @@ export default function DashboardPage() {
                 <Link
                   key={draft.id}
                   href={`/compose/${draft.id}`}
-                  className="flex items-center justify-between px-5 py-3 hover:bg-zinc-50 transition-colors"
+                  className="flex items-center justify-between px-5 py-3 hover:bg-brand-50/50 transition-colors"
                 >
                   <div className="min-w-0">
                     <div className="truncate text-sm font-medium">{draft.subject}</div>
@@ -116,7 +116,7 @@ export default function DashboardPage() {
                       draft.status === "SENT"
                         ? "bg-emerald-50 text-emerald-700"
                         : draft.status === "APPROVED"
-                        ? "bg-blue-50 text-blue-700"
+                        ? "bg-brand-50 text-brand-600"
                         : "bg-zinc-100 text-zinc-600"
                     }`}
                   >
@@ -129,32 +129,32 @@ export default function DashboardPage() {
         </div>
 
         {/* Quick Actions */}
-        <div className="rounded-xl border border-zinc-200 bg-white">
-          <div className="border-b border-zinc-100 px-5 py-4">
+        <div className="rounded-xl border border-brand-100 bg-white">
+          <div className="border-b border-brand-50 px-5 py-4">
             <h2 className="text-sm font-semibold">Quick Actions</h2>
           </div>
           <div className="grid grid-cols-1 gap-3 p-5">
             <Link
               href="/contacts"
-              className="rounded-lg border border-zinc-200 px-4 py-3 text-sm font-medium transition-colors hover:bg-zinc-50"
+              className="rounded-lg border border-brand-100 px-4 py-3 text-sm font-medium transition-colors hover:bg-brand-50/50"
             >
               Add a new contact
             </Link>
             <Link
               href="/templates"
-              className="rounded-lg border border-zinc-200 px-4 py-3 text-sm font-medium transition-colors hover:bg-zinc-50"
+              className="rounded-lg border border-brand-100 px-4 py-3 text-sm font-medium transition-colors hover:bg-brand-50/50"
             >
               Create an email template
             </Link>
             <Link
               href="/campaigns/new"
-              className="rounded-lg border border-zinc-200 px-4 py-3 text-sm font-medium transition-colors hover:bg-zinc-50"
+              className="rounded-lg border border-brand-100 px-4 py-3 text-sm font-medium transition-colors hover:bg-brand-50/50"
             >
               Start a new campaign
             </Link>
             <Link
               href="/settings"
-              className="rounded-lg border border-zinc-200 px-4 py-3 text-sm font-medium transition-colors hover:bg-zinc-50"
+              className="rounded-lg border border-brand-100 px-4 py-3 text-sm font-medium transition-colors hover:bg-brand-50/50"
             >
               Check API connections
             </Link>

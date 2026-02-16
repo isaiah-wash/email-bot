@@ -100,7 +100,7 @@ export default function TemplatesPage() {
   if (status === "loading" || !session) {
     return (
       <div className="flex h-[80vh] items-center justify-center">
-        <div className="h-5 w-5 rounded-full border-2 border-zinc-300 border-t-zinc-600 animate-spin" />
+        <div className="h-5 w-5 rounded-full border-2 border-brand-200 border-t-brand-500 animate-spin" />
       </div>
     );
   }
@@ -119,14 +119,14 @@ export default function TemplatesPage() {
             setForm({ name: "", subjectTemplate: "", bodyInstructions: "" });
             setSelectedCampaignIds([]);
           }}
-          className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 transition-colors"
+          className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 transition-colors"
         >
           {showForm ? "Cancel" : "New Template"}
         </button>
       </div>
 
       {showForm && (
-        <form onSubmit={handleSubmit} className="mb-6 rounded-xl border border-zinc-200 bg-white p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="mb-6 rounded-xl border border-brand-100 bg-white p-6 space-y-4">
           <div>
             <label className="block text-sm font-medium text-zinc-700 mb-1">Template Name</label>
             <input
@@ -134,7 +134,7 @@ export default function TemplatesPage() {
               required
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
-              className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-400"
+              className="w-full rounded-lg border border-brand-100 px-3 py-2 text-sm focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
               placeholder="Cold Outreach — Enterprise"
             />
           </div>
@@ -145,7 +145,7 @@ export default function TemplatesPage() {
               required
               value={form.subjectTemplate}
               onChange={(e) => setForm({ ...form, subjectTemplate: e.target.value })}
-              className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-400"
+              className="w-full rounded-lg border border-brand-100 px-3 py-2 text-sm focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
               placeholder="Quick question about {{company}}'s approach to..."
             />
             <p className="mt-1 text-xs text-zinc-400">Use {"{{variable}}"} for dynamic content</p>
@@ -157,7 +157,7 @@ export default function TemplatesPage() {
               value={form.bodyInstructions}
               onChange={(e) => setForm({ ...form, bodyInstructions: e.target.value })}
               rows={6}
-              className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-400"
+              className="w-full rounded-lg border border-brand-100 px-3 py-2 text-sm focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
               placeholder="Write a friendly cold outreach email. Reference the contact's current role and company. Mention how our product helps with [specific value prop]. Keep it under 150 words. End with a soft CTA asking for a 15-minute call."
             />
             <p className="mt-1 text-xs text-zinc-400">Instructions for Claude to generate the email body</p>
@@ -169,11 +169,11 @@ export default function TemplatesPage() {
             {campaigns.length === 0 ? (
               <p className="text-sm text-zinc-400">No campaigns available.</p>
             ) : (
-              <div className="max-h-48 overflow-y-auto rounded-lg border border-zinc-200 divide-y divide-zinc-100">
+              <div className="max-h-48 overflow-y-auto rounded-lg border border-brand-100 divide-y divide-brand-50">
                 {campaigns.map((campaign) => (
                   <label
                     key={campaign.id}
-                    className="flex items-center gap-3 px-3 py-2.5 hover:bg-zinc-50 cursor-pointer"
+                    className="flex items-center gap-3 px-3 py-2.5 hover:bg-brand-50/50 cursor-pointer"
                   >
                     <input
                       type="checkbox"
@@ -185,7 +185,7 @@ export default function TemplatesPage() {
                             : [...prev, campaign.id]
                         )
                       }
-                      className="rounded border-zinc-300"
+                      className="rounded border-brand-200 text-brand-500 focus:ring-brand-400"
                     />
                     <span className="text-sm">{campaign.name}</span>
                   </label>
@@ -197,7 +197,7 @@ export default function TemplatesPage() {
             <button
               type="submit"
               disabled={saving}
-              className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
+              className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50"
             >
               {saving ? "Saving..." : editingId ? "Update Template" : "Create Template"}
             </button>
@@ -207,16 +207,16 @@ export default function TemplatesPage() {
 
       {loading ? (
         <div className="flex h-40 items-center justify-center">
-          <div className="h-5 w-5 rounded-full border-2 border-zinc-300 border-t-zinc-600 animate-spin" />
+          <div className="h-5 w-5 rounded-full border-2 border-brand-200 border-t-brand-500 animate-spin" />
         </div>
       ) : templates.length === 0 ? (
-        <div className="rounded-xl border border-zinc-200 bg-white py-16 text-center">
+        <div className="rounded-xl border border-brand-100 bg-white py-16 text-center">
           <p className="text-zinc-500">No templates yet. Create your first template to start generating emails.</p>
         </div>
       ) : (
         <div className="space-y-4">
           {templates.map((template) => (
-            <div key={template.id} className="rounded-xl border border-zinc-200 bg-white p-5">
+            <div key={template.id} className="rounded-xl border border-brand-100 bg-white p-5">
               <div className="flex items-start justify-between">
                 <div>
                   <h3 className="text-sm font-semibold">{template.name}</h3>
@@ -226,7 +226,7 @@ export default function TemplatesPage() {
                   <span className="text-xs text-zinc-400">{template._count.campaigns} campaigns</span>
                   <button
                     onClick={() => startEdit(template)}
-                    className="text-xs text-zinc-500 hover:text-zinc-900"
+                    className="text-xs text-brand-500 hover:text-brand-700"
                   >
                     Edit
                   </button>
@@ -238,7 +238,7 @@ export default function TemplatesPage() {
                   </button>
                 </div>
               </div>
-              <div className="mt-3 rounded-lg bg-zinc-50 p-3">
+              <div className="mt-3 rounded-lg bg-brand-50/50 p-3">
                 <p className="text-xs text-zinc-600 whitespace-pre-wrap line-clamp-4">
                   {template.bodyInstructions}
                 </p>

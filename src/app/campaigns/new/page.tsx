@@ -68,7 +68,7 @@ export default function NewCampaignPage() {
   if (status === "loading" || !session) {
     return (
       <div className="flex h-[80vh] items-center justify-center">
-        <div className="h-5 w-5 rounded-full border-2 border-zinc-300 border-t-zinc-600 animate-spin" />
+        <div className="h-5 w-5 rounded-full border-2 border-brand-200 border-t-brand-500 animate-spin" />
       </div>
     );
   }
@@ -78,7 +78,7 @@ export default function NewCampaignPage() {
       <h1 className="text-2xl font-semibold tracking-tight mb-6">New Campaign</h1>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="rounded-xl border border-zinc-200 bg-white p-6 space-y-4">
+        <div className="rounded-xl border border-brand-100 bg-white p-6 space-y-4">
           <div>
             <label className="block text-sm font-medium text-zinc-700 mb-1">Campaign Name</label>
             <input
@@ -86,7 +86,7 @@ export default function NewCampaignPage() {
               required
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
-              className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-400"
+              className="w-full rounded-lg border border-brand-100 px-3 py-2 text-sm focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
               placeholder="Q1 Outreach"
             />
           </div>
@@ -96,7 +96,7 @@ export default function NewCampaignPage() {
               type="text"
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
-              className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-400"
+              className="w-full rounded-lg border border-brand-100 px-3 py-2 text-sm focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
               placeholder="Cold outreach to potential enterprise clients"
             />
           </div>
@@ -106,7 +106,7 @@ export default function NewCampaignPage() {
               value={form.context}
               onChange={(e) => setForm({ ...form, context: e.target.value })}
               rows={4}
-              className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-400"
+              className="w-full rounded-lg border border-brand-100 px-3 py-2 text-sm focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
               placeholder="We are offering a 20% discount on our Enterprise plan for Q1. Focus on how our product reduces manual work..."
             />
           </div>
@@ -115,7 +115,7 @@ export default function NewCampaignPage() {
             <select
               value={form.templateId}
               onChange={(e) => setForm({ ...form, templateId: e.target.value })}
-              className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm"
+              className="w-full rounded-lg border border-brand-100 bg-white px-3 py-2 text-sm"
             >
               <option value="">No template</option>
               {templates.map((t) => (
@@ -125,22 +125,22 @@ export default function NewCampaignPage() {
           </div>
         </div>
 
-        <div className="rounded-xl border border-zinc-200 bg-white p-6">
+        <div className="rounded-xl border border-brand-100 bg-white p-6">
           <h2 className="text-sm font-semibold mb-3">Select Contacts ({selectedContacts.length} selected)</h2>
           {contacts.length === 0 ? (
             <p className="text-sm text-zinc-400">No contacts available. Add contacts first.</p>
           ) : (
-            <div className="max-h-64 overflow-y-auto divide-y divide-zinc-100">
+            <div className="max-h-64 overflow-y-auto divide-y divide-brand-50">
               {contacts.map((contact) => (
                 <label
                   key={contact.id}
-                  className="flex items-center gap-3 px-2 py-2.5 hover:bg-zinc-50 cursor-pointer"
+                  className="flex items-center gap-3 px-2 py-2.5 hover:bg-brand-50/50 cursor-pointer"
                 >
                   <input
                     type="checkbox"
                     checked={selectedContacts.includes(contact.id)}
                     onChange={() => toggleContact(contact.id)}
-                    className="rounded border-zinc-300"
+                    className="rounded border-brand-200 text-brand-500 focus:ring-brand-400"
                   />
                   <div className="min-w-0">
                     <div className="text-sm font-medium">
@@ -160,14 +160,14 @@ export default function NewCampaignPage() {
           <button
             type="button"
             onClick={() => router.back()}
-            className="rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium hover:bg-zinc-50"
+            className="rounded-lg border border-brand-100 px-4 py-2 text-sm font-medium hover:bg-brand-50/50"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={saving || !form.name}
-            className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
+            className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50"
           >
             {saving ? "Creating..." : "Create Campaign"}
           </button>

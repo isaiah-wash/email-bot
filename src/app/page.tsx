@@ -14,21 +14,21 @@ export default function LandingPage() {
 
   if (status === "loading" || session) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center bg-zinc-950">
-        <div className="h-5 w-5 rounded-full border-2 border-zinc-700 border-t-zinc-300 animate-spin" />
+      <div className="fixed inset-0 flex items-center justify-center bg-brand-900">
+        <div className="h-5 w-5 rounded-full border-2 border-brand-700 border-t-brand-300 animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="fixed inset-0 flex flex-col bg-zinc-950 overflow-auto">
+    <div className="fixed inset-0 flex flex-col bg-brand-900 overflow-auto">
       {/* Background grid */}
       <div
         className="pointer-events-none absolute inset-0 opacity-[0.03]"
         style={{
           backgroundImage: `
-            linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)
+            linear-gradient(rgba(153,136,255,0.5) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(153,136,255,0.5) 1px, transparent 1px)
           `,
           backgroundSize: "64px 64px",
         }}
@@ -39,7 +39,7 @@ export default function LandingPage() {
         className="pointer-events-none absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[600px] opacity-20"
         style={{
           background:
-            "radial-gradient(ellipse at center, rgba(161,161,170,0.3) 0%, transparent 70%)",
+            "radial-gradient(ellipse at center, rgba(104,79,248,0.4) 0%, transparent 70%)",
         }}
       />
 
@@ -47,15 +47,15 @@ export default function LandingPage() {
         {/* Logo mark */}
         <div className="mb-10 flex items-center gap-3">
           <div className="relative flex h-10 w-10 items-center justify-center">
-            <div className="absolute inset-0 rounded-lg bg-zinc-800 rotate-3" />
-            <div className="absolute inset-0 rounded-lg bg-zinc-700 -rotate-2" />
-            <div className="relative rounded-lg bg-zinc-100 h-full w-full flex items-center justify-center">
+            <div className="absolute inset-0 rounded-lg bg-brand-600 rotate-3" />
+            <div className="absolute inset-0 rounded-lg bg-brand-500 -rotate-2" />
+            <div className="relative rounded-lg bg-white h-full w-full flex items-center justify-center">
               <svg
                 width="20"
                 height="16"
                 viewBox="0 0 20 16"
                 fill="none"
-                className="text-zinc-900"
+                className="text-brand-900"
               >
                 <path
                   d="M1 3L10 9L19 3"
@@ -76,19 +76,19 @@ export default function LandingPage() {
               </svg>
             </div>
           </div>
-          <span className="text-xl font-semibold text-zinc-100 tracking-tight font-[family-name:var(--font-geist-sans)]">
+          <span className="text-xl font-semibold text-white tracking-tight">
             EmailBotemis
           </span>
         </div>
 
         {/* Headline */}
-        <h1 className="max-w-lg text-center text-[2.5rem] leading-[1.1] font-bold tracking-tight text-zinc-100 font-[family-name:var(--font-geist-sans)] sm:text-5xl">
+        <h1 className="max-w-lg text-center text-[2.5rem] leading-[1.1] font-bold tracking-tight text-white sm:text-5xl">
           Outreach that
           <br />
-          <span className="text-zinc-500">feels personal</span>
+          <span className="text-brand-300">feels personal</span>
         </h1>
 
-        <p className="mt-5 max-w-md text-center text-base leading-relaxed text-zinc-400 font-[family-name:var(--font-geist-sans)]">
+        <p className="mt-5 max-w-md text-center text-base leading-relaxed text-brand-200/60">
           Connect your Gmail, enrich contacts from LinkedIn, and let AI draft
           emails your recipients actually want to read.
         </p>
@@ -96,7 +96,7 @@ export default function LandingPage() {
         {/* Sign in button */}
         <button
           onClick={() => signIn("google")}
-          className="group mt-10 flex items-center gap-3 rounded-full bg-zinc-100 px-6 py-3 text-sm font-medium text-zinc-900 transition-all hover:bg-white hover:shadow-[0_0_32px_rgba(255,255,255,0.15)] active:scale-[0.98]"
+          className="group mt-10 flex items-center gap-3 rounded-full bg-white px-6 py-3 text-sm font-medium text-brand-900 transition-all hover:bg-brand-50 hover:shadow-[0_0_32px_rgba(104,79,248,0.25)] active:scale-[0.98]"
         >
           <svg width="18" height="18" viewBox="0 0 18 18" className="shrink-0">
             <path
@@ -152,14 +152,14 @@ export default function LandingPage() {
           ].map((feature) => (
             <div
               key={feature.label}
-              className="group flex items-center gap-3 rounded-xl border border-zinc-800 bg-zinc-900/60 px-5 py-3.5 backdrop-blur-sm transition-colors hover:border-zinc-700"
+              className="group flex items-center gap-3 rounded-xl border border-brand-800/50 bg-brand-900/60 px-5 py-3.5 backdrop-blur-sm transition-colors hover:border-brand-500/30"
             >
-              <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 opacity-80" />
+              <div className="h-1.5 w-1.5 rounded-full bg-brand-400 opacity-80" />
               <div>
-                <div className="text-sm font-medium text-zinc-200 font-[family-name:var(--font-geist-sans)]">
+                <div className="text-sm font-medium text-brand-100">
                   {feature.label}
                 </div>
-                <div className="text-xs text-zinc-500 font-[family-name:var(--font-geist-sans)]">
+                <div className="text-xs text-brand-300/40">
                   {feature.detail}
                 </div>
               </div>
@@ -168,11 +168,11 @@ export default function LandingPage() {
         </div>
 
         {/* Bottom details */}
-        <div className="mt-16 flex items-center gap-6 text-xs text-zinc-600 font-[family-name:var(--font-geist-mono)]">
+        <div className="mt-16 flex items-center gap-6 text-xs text-brand-300/30 font-[family-name:var(--font-mono)]">
           <span>Local-first</span>
-          <span className="h-3 w-px bg-zinc-800" />
+          <span className="h-3 w-px bg-brand-800" />
           <span>You review every email</span>
-          <span className="h-3 w-px bg-zinc-800" />
+          <span className="h-3 w-px bg-brand-800" />
           <span>Your data stays yours</span>
         </div>
       </div>

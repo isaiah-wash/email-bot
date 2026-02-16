@@ -19,13 +19,13 @@ export function Nav() {
   if (!session) return null;
 
   return (
-    <nav className="border-b border-zinc-200 bg-white">
+    <nav className="border-b border-brand-100 bg-white">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-14 items-center justify-between">
           <div className="flex items-center gap-8">
             <Link
               href="/dashboard"
-              className="text-lg font-semibold text-zinc-900 tracking-tight"
+              className="text-lg font-semibold text-brand-900 tracking-tight"
             >
               EmailBotemis
             </Link>
@@ -38,8 +38,8 @@ export function Nav() {
                     href={item.href}
                     className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
                       isActive
-                        ? "bg-zinc-100 text-zinc-900"
-                        : "text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50"
+                        ? "bg-brand-50 text-brand-600"
+                        : "text-zinc-500 hover:text-brand-600 hover:bg-brand-50/50"
                     }`}
                   >
                     {item.label}
@@ -61,7 +61,7 @@ export function Nav() {
             </span>
             <button
               onClick={() => signOut({ callbackUrl: "/" })}
-              className="text-sm text-zinc-500 hover:text-zinc-900 transition-colors"
+              className="text-sm text-zinc-500 hover:text-brand-600 transition-colors"
             >
               Sign out
             </button>

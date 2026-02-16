@@ -207,7 +207,7 @@ export default function ContactsPage() {
   if (status === "loading" || !session) {
     return (
       <div className="flex h-[80vh] items-center justify-center">
-        <div className="h-5 w-5 rounded-full border-2 border-zinc-300 border-t-zinc-600 animate-spin" />
+        <div className="h-5 w-5 rounded-full border-2 border-brand-200 border-t-brand-500 animate-spin" />
       </div>
     );
   }
@@ -230,13 +230,13 @@ export default function ContactsPage() {
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={importing}
-            className="rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition-colors disabled:opacity-50"
+            className="rounded-lg border border-brand-100 bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-brand-50/50 transition-colors disabled:opacity-50"
           >
             {importing ? "Importing..." : "Import CSV"}
           </button>
           <button
             onClick={() => setShowForm(!showForm)}
-            className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 transition-colors"
+            className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 transition-colors"
           >
             {showForm ? "Cancel" : "Add Contact"}
           </button>
@@ -287,7 +287,7 @@ export default function ContactsPage() {
       )}
 
       {showForm && (
-        <form onSubmit={handleCreate} className="mb-6 rounded-xl border border-zinc-200 bg-white p-5">
+        <form onSubmit={handleCreate} className="mb-6 rounded-xl border border-brand-100 bg-white p-5">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="block text-xs font-medium text-zinc-500 mb-1">First Name</label>
@@ -295,7 +295,7 @@ export default function ContactsPage() {
                 type="text"
                 value={form.firstName}
                 onChange={(e) => setForm({ ...form, firstName: e.target.value })}
-                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-400"
+                className="w-full rounded-lg border border-brand-100 px-3 py-2 text-sm focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
                 placeholder="Jane"
               />
             </div>
@@ -305,7 +305,7 @@ export default function ContactsPage() {
                 type="text"
                 value={form.lastName}
                 onChange={(e) => setForm({ ...form, lastName: e.target.value })}
-                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-400"
+                className="w-full rounded-lg border border-brand-100 px-3 py-2 text-sm focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
                 placeholder="Smith"
               />
             </div>
@@ -315,7 +315,7 @@ export default function ContactsPage() {
                 type="email"
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
-                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-400"
+                className="w-full rounded-lg border border-brand-100 px-3 py-2 text-sm focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
                 placeholder="jane@company.com"
               />
             </div>
@@ -325,7 +325,7 @@ export default function ContactsPage() {
                 type="url"
                 value={form.linkedinUrl}
                 onChange={(e) => setForm({ ...form, linkedinUrl: e.target.value })}
-                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-400"
+                className="w-full rounded-lg border border-brand-100 px-3 py-2 text-sm focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
                 placeholder="https://linkedin.com/in/janesmith"
               />
             </div>
@@ -334,7 +334,7 @@ export default function ContactsPage() {
             <button
               type="submit"
               disabled={saving}
-              className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 transition-colors disabled:opacity-50"
+              className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 transition-colors disabled:opacity-50"
             >
               {saving ? "Saving..." : "Save Contact"}
             </button>
@@ -348,25 +348,25 @@ export default function ContactsPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search contacts by name, email, or company..."
-          className="w-full rounded-lg border border-zinc-200 bg-white px-4 py-2.5 text-sm focus:border-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-400"
+          className="w-full rounded-lg border border-brand-100 bg-white px-4 py-2.5 text-sm focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
         />
       </form>
 
       {loading ? (
         <div className="flex h-40 items-center justify-center">
-          <div className="h-5 w-5 rounded-full border-2 border-zinc-300 border-t-zinc-600 animate-spin" />
+          <div className="h-5 w-5 rounded-full border-2 border-brand-200 border-t-brand-500 animate-spin" />
         </div>
       ) : contacts.length === 0 ? (
-        <div className="rounded-xl border border-zinc-200 bg-white py-16 text-center">
+        <div className="rounded-xl border border-brand-100 bg-white py-16 text-center">
           <p className="text-zinc-500">No contacts yet. Add your first contact to get started.</p>
         </div>
       ) : (
-        <div className="rounded-xl border border-zinc-200 bg-white divide-y divide-zinc-100">
+        <div className="rounded-xl border border-brand-100 bg-white divide-y divide-brand-50">
           {contacts.map((contact) => (
             <Link
               key={contact.id}
               href={`/contacts/${contact.id}`}
-              className="flex items-center justify-between px-5 py-4 hover:bg-zinc-50 transition-colors"
+              className="flex items-center justify-between px-5 py-4 hover:bg-brand-50/50 transition-colors"
             >
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
@@ -387,7 +387,7 @@ export default function ContactsPage() {
               </div>
               <div className="ml-4 flex items-center gap-3 shrink-0">
                 {contact.linkedinUrl && (
-                  <span className="rounded bg-blue-50 px-1.5 py-0.5 text-xs text-blue-700">LI</span>
+                  <span className="rounded bg-brand-50 px-1.5 py-0.5 text-xs text-brand-600">LI</span>
                 )}
                 <span className="text-xs text-zinc-400">{contact._count.emailDrafts} drafts</span>
                 <svg
@@ -395,7 +395,7 @@ export default function ContactsPage() {
                   height="16"
                   viewBox="0 0 16 16"
                   fill="none"
-                  className="text-zinc-300"
+                  className="text-brand-200"
                 >
                   <path d="M6 4L10 8L6 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>

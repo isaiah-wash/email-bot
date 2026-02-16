@@ -101,7 +101,7 @@ export default function CampaignDetailPage() {
   if (status === "loading" || loading || !session) {
     return (
       <div className="flex h-[80vh] items-center justify-center">
-        <div className="h-5 w-5 rounded-full border-2 border-zinc-300 border-t-zinc-600 animate-spin" />
+        <div className="h-5 w-5 rounded-full border-2 border-brand-200 border-t-brand-500 animate-spin" />
       </div>
     );
   }
@@ -114,7 +114,7 @@ export default function CampaignDetailPage() {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      <Link href="/campaigns" className="text-sm text-zinc-500 hover:text-zinc-900 mb-4 inline-block">
+      <Link href="/campaigns" className="text-sm text-brand-500 hover:text-brand-700 mb-4 inline-block">
         &larr; Back to campaigns
       </Link>
 
@@ -124,7 +124,7 @@ export default function CampaignDetailPage() {
             <h1 className="text-2xl font-semibold tracking-tight">{campaign.name}</h1>
             <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
               campaign.status === "COMPLETED" ? "bg-emerald-50 text-emerald-700" :
-              campaign.status === "ACTIVE" ? "bg-blue-50 text-blue-700" :
+              campaign.status === "ACTIVE" ? "bg-brand-50 text-brand-600" :
               "bg-zinc-100 text-zinc-600"
             }`}>
               {campaign.status}
@@ -139,7 +139,7 @@ export default function CampaignDetailPage() {
             <button
               onClick={handleGenerate}
               disabled={generating}
-              className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
+              className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50"
             >
               {generating ? "Generating..." : `Generate Drafts (${pendingCount})`}
             </button>
@@ -155,35 +155,35 @@ export default function CampaignDetailPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4 mb-6">
-        <div className="rounded-xl border border-zinc-200 bg-white p-4 text-center">
+        <div className="rounded-xl border border-brand-100 bg-white p-4 text-center">
           <div className="text-2xl font-semibold">{pendingCount}</div>
           <div className="text-xs text-zinc-500 mt-0.5">Pending</div>
         </div>
-        <div className="rounded-xl border border-zinc-200 bg-white p-4 text-center">
+        <div className="rounded-xl border border-brand-100 bg-white p-4 text-center">
           <div className="text-2xl font-semibold">{draftReadyCount}</div>
           <div className="text-xs text-zinc-500 mt-0.5">Drafts Ready</div>
         </div>
-        <div className="rounded-xl border border-zinc-200 bg-white p-4 text-center">
+        <div className="rounded-xl border border-brand-100 bg-white p-4 text-center">
           <div className="text-2xl font-semibold">{sentCount}</div>
           <div className="text-xs text-zinc-500 mt-0.5">Sent</div>
         </div>
       </div>
 
       {campaign.context && (
-        <div className="rounded-xl border border-zinc-200 bg-white p-5 mb-6">
+        <div className="rounded-xl border border-brand-100 bg-white p-5 mb-6">
           <h2 className="text-sm font-semibold mb-2">Campaign Context</h2>
           <p className="text-sm text-zinc-600 whitespace-pre-wrap">{campaign.context}</p>
         </div>
       )}
 
       {/* Template Selector */}
-      <div className="rounded-xl border border-zinc-200 bg-white p-5 mb-6">
+      <div className="rounded-xl border border-brand-100 bg-white p-5 mb-6">
         <h2 className="text-sm font-semibold mb-2">Template</h2>
         <select
           value={campaign.template?.id || ""}
           onChange={(e) => handleTemplateChange(e.target.value)}
           disabled={updatingTemplate}
-          className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm disabled:opacity-50"
+          className="w-full rounded-lg border border-brand-100 bg-white px-3 py-2 text-sm disabled:opacity-50"
         >
           <option value="">No template</option>
           {templates.map((t) => (
@@ -196,13 +196,13 @@ export default function CampaignDetailPage() {
       </div>
 
       {/* Contacts table */}
-      <div className="rounded-xl border border-zinc-200 bg-white">
-        <div className="border-b border-zinc-100 px-5 py-4">
+      <div className="rounded-xl border border-brand-100 bg-white">
+        <div className="border-b border-brand-50 px-5 py-4">
           <h2 className="text-sm font-semibold">
             Contacts ({campaign.contacts.length})
           </h2>
         </div>
-        <div className="divide-y divide-zinc-100">
+        <div className="divide-y divide-brand-50">
           {campaign.contacts.map((cc) => {
             const name = [cc.contact.firstName, cc.contact.lastName].filter(Boolean).join(" ") || "Unnamed";
             const latestDraft = cc.drafts[0];
@@ -220,7 +220,7 @@ export default function CampaignDetailPage() {
                 <div className="flex items-center gap-3 shrink-0 ml-4">
                   <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                     cc.status === "SENT" ? "bg-emerald-50 text-emerald-700" :
-                    cc.status === "APPROVED" ? "bg-blue-50 text-blue-700" :
+                    cc.status === "APPROVED" ? "bg-brand-50 text-brand-600" :
                     cc.status === "DRAFT_READY" ? "bg-amber-50 text-amber-700" :
                     "bg-zinc-100 text-zinc-600"
                   }`}>
@@ -229,7 +229,7 @@ export default function CampaignDetailPage() {
                   {latestDraft && (
                     <Link
                       href={`/compose/${latestDraft.id}`}
-                      className="text-xs text-blue-600 hover:underline"
+                      className="text-xs text-brand-500 hover:underline"
                     >
                       {latestDraft.status === "SENT" ? "View" : "Review"}
                     </Link>
