@@ -4,6 +4,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import Chat from "@/components/chat";
 
 interface Stats {
   contacts: number;
@@ -161,6 +162,7 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+      <Chat />
     </div>
   );
 }
