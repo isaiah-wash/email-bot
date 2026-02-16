@@ -13,6 +13,12 @@ interface Template {
   createdAt: string;
 }
 
+interface Campaign {
+  id: string;
+  name: string;
+  template: { id: string } | null;
+}
+
 export default function TemplatesPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -26,6 +32,8 @@ export default function TemplatesPage() {
     bodyInstructions: "",
   });
   const [saving, setSaving] = useState(false);
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [selectedCampaignIds, setSelectedCampaignIds] = useState<string[]>([]);
 
   useEffect(() => {
     if (status === "unauthenticated") router.replace("/");
@@ -34,6 +42,7 @@ export default function TemplatesPage() {
   useEffect(() => {
     if (!session) return;
     fetchTemplates();
+    fetch("/api/campaigns").then((r) => r.json()).then(setCampaigns);
   }, [session]);
 
   async function fetchTemplates() {
@@ -52,19 +61,21 @@ export default function TemplatesPage() {
     const res = await fetch(url, {
       method,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
+      body: JSON.stringify({ ...form, campaignIds: selectedCampaignIds }),
     });
 
     if (res.ok) {
       setForm({ name: "", subjectTemplate: "", bodyInstructions: "" });
+      setSelectedCampaignIds([]);
       setShowForm(false);
       setEditingId(null);
       fetchTemplates();
+      fetch("/api/campaigns").then((r) => r.json()).then(setCampaigns);
     }
     setSaving(false);
   }
 
-  function startEdit(template: Template) {
+  async function startEdit(template: Template) {
     setForm({
       name: template.name,
       subjectTemplate: template.subjectTemplate,
@@ -72,6 +83,12 @@ export default function TemplatesPage() {
     });
     setEditingId(template.id);
     setShowForm(true);
+    // Fetch current campaign assignments for this template
+    const res = await fetch(`/api/templates/${template.id}`);
+    if (res.ok) {
+      const data = await res.json();
+      setSelectedCampaignIds(data.campaigns?.map((c: { id: string }) => c.id) || []);
+    }
   }
 
   async function handleDelete(id: string) {
@@ -100,6 +117,7 @@ export default function TemplatesPage() {
             setShowForm(!showForm);
             setEditingId(null);
             setForm({ name: "", subjectTemplate: "", bodyInstructions: "" });
+            setSelectedCampaignIds([]);
           }}
           className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 transition-colors"
         >
@@ -143,6 +161,37 @@ export default function TemplatesPage() {
               placeholder="Write a friendly cold outreach email. Reference the contact's current role and company. Mention how our product helps with [specific value prop]. Keep it under 150 words. End with a soft CTA asking for a 15-minute call."
             />
             <p className="mt-1 text-xs text-zinc-400">Instructions for Claude to generate the email body</p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-zinc-700 mb-2">
+              Assign to Campaigns ({selectedCampaignIds.length} selected)
+            </label>
+            {campaigns.length === 0 ? (
+              <p className="text-sm text-zinc-400">No campaigns available.</p>
+            ) : (
+              <div className="max-h-48 overflow-y-auto rounded-lg border border-zinc-200 divide-y divide-zinc-100">
+                {campaigns.map((campaign) => (
+                  <label
+                    key={campaign.id}
+                    className="flex items-center gap-3 px-3 py-2.5 hover:bg-zinc-50 cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedCampaignIds.includes(campaign.id)}
+                      onChange={() =>
+                        setSelectedCampaignIds((prev) =>
+                          prev.includes(campaign.id)
+                            ? prev.filter((id) => id !== campaign.id)
+                            : [...prev, campaign.id]
+                        )
+                      }
+                      className="rounded border-zinc-300"
+                    />
+                    <span className="text-sm">{campaign.name}</span>
+                  </label>
+                ))}
+              </div>
+            )}
           </div>
           <div className="flex justify-end">
             <button

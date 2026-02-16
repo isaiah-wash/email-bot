@@ -5,6 +5,11 @@ import { useRouter, useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
+interface TemplateOption {
+  id: string;
+  name: string;
+}
+
 interface Campaign {
   id: string;
   name: string;
@@ -40,6 +45,8 @@ export default function CampaignDetailPage() {
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [templates, setTemplates] = useState<TemplateOption[]>([]);
+  const [updatingTemplate, setUpdatingTemplate] = useState(false);
 
   useEffect(() => {
     if (status === "unauthenticated") router.replace("/");
@@ -48,6 +55,7 @@ export default function CampaignDetailPage() {
   useEffect(() => {
     if (!session) return;
     fetchCampaign();
+    fetch("/api/templates").then((r) => r.json()).then(setTemplates);
   }, [session, campaignId]);
 
   async function fetchCampaign() {
@@ -69,6 +77,19 @@ export default function CampaignDetailPage() {
       fetchCampaign();
     }
     setGenerating(false);
+  }
+
+  async function handleTemplateChange(templateId: string) {
+    setUpdatingTemplate(true);
+    const res = await fetch(`/api/campaigns/${campaignId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ templateId: templateId || null }),
+    });
+    if (res.ok) {
+      await fetchCampaign();
+    }
+    setUpdatingTemplate(false);
   }
 
   async function handleDelete() {
@@ -154,6 +175,25 @@ export default function CampaignDetailPage() {
           <p className="text-sm text-zinc-600 whitespace-pre-wrap">{campaign.context}</p>
         </div>
       )}
+
+      {/* Template Selector */}
+      <div className="rounded-xl border border-zinc-200 bg-white p-5 mb-6">
+        <h2 className="text-sm font-semibold mb-2">Template</h2>
+        <select
+          value={campaign.template?.id || ""}
+          onChange={(e) => handleTemplateChange(e.target.value)}
+          disabled={updatingTemplate}
+          className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm disabled:opacity-50"
+        >
+          <option value="">No template</option>
+          {templates.map((t) => (
+            <option key={t.id} value={t.id}>{t.name}</option>
+          ))}
+        </select>
+        {!campaign.template && (
+          <p className="mt-1.5 text-xs text-zinc-400">Assign a template to enable draft generation</p>
+        )}
+      </div>
 
       {/* Contacts table */}
       <div className="rounded-xl border border-zinc-200 bg-white">

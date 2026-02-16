@@ -13,6 +13,7 @@ export async function GET(
 
   const template = await prisma.template.findFirst({
     where: { id, userId: user.id },
+    include: { campaigns: { select: { id: true } } },
   });
 
   if (!template) {
@@ -59,6 +60,21 @@ export async function PATCH(
       ...(body.variables !== undefined && { variables: body.variables }),
     },
   });
+
+  if (body.campaignIds !== undefined) {
+    // Unassign campaigns currently pointing to this template that are NOT in the new list
+    await prisma.campaign.updateMany({
+      where: { templateId: id, id: { notIn: body.campaignIds } },
+      data: { templateId: null },
+    });
+    // Assign selected campaigns to this template
+    if (body.campaignIds.length > 0) {
+      await prisma.campaign.updateMany({
+        where: { id: { in: body.campaignIds }, userId: user.id },
+        data: { templateId: id },
+      });
+    }
+  }
 
   return NextResponse.json(template);
 }

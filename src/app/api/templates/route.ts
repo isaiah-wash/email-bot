@@ -41,5 +41,12 @@ export async function POST(req: NextRequest) {
     },
   });
 
+  if (body.campaignIds?.length) {
+    await prisma.campaign.updateMany({
+      where: { id: { in: body.campaignIds }, userId: user.id },
+      data: { templateId: template.id },
+    });
+  }
+
   return NextResponse.json(template, { status: 201 });
 }
