@@ -2,15 +2,91 @@
 
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+
+const TAG_COLORS = [
+  { label: "Indigo", value: "#6366f1" },
+  { label: "Violet", value: "#8b5cf6" },
+  { label: "Sky", value: "#0ea5e9" },
+  { label: "Teal", value: "#14b8a6" },
+  { label: "Emerald", value: "#10b981" },
+  { label: "Amber", value: "#f59e0b" },
+  { label: "Rose", value: "#f43f5e" },
+  { label: "Zinc", value: "#71717a" },
+];
+
+interface Tag {
+  id: string;
+  name: string;
+  color: string;
+  _count: { contacts: number };
+}
 
 export default function SettingsPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
 
+  const [tags, setTags] = useState<Tag[]>([]);
+  const [editingTagId, setEditingTagId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editColor, setEditColor] = useState("");
+  const [tagError, setTagError] = useState("");
+  const [deletingTagId, setDeletingTagId] = useState<string | null>(null);
+
   useEffect(() => {
     if (status === "unauthenticated") router.replace("/");
   }, [status, router]);
+
+  useEffect(() => {
+    if (!session) return;
+    fetchTags();
+  }, [session]);
+
+  async function fetchTags() {
+    const res = await fetch("/api/tags");
+    const data = await res.json();
+    if (Array.isArray(data)) setTags(data);
+  }
+
+  function startEditTag(tag: Tag) {
+    setEditingTagId(tag.id);
+    setEditName(tag.name);
+    setEditColor(tag.color);
+    setTagError("");
+  }
+
+  async function saveTagEdit(tagId: string) {
+    setTagError("");
+    const res = await fetch(`/api/tags/${tagId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: editName.trim(), color: editColor }),
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      setTags((prev) => prev.map((t) => (t.id === tagId ? updated : t)));
+      setEditingTagId(null);
+    } else {
+      const data = await res.json();
+      setTagError(data.error || "Failed to update tag");
+    }
+  }
+
+  async function handleDeleteTag(tag: Tag) {
+    if (
+      !confirm(
+        `Delete tag "${tag.name}"? It will be removed from all ${tag._count.contacts} contact${tag._count.contacts !== 1 ? "s" : ""}.`
+      )
+    )
+      return;
+
+    setDeletingTagId(tag.id);
+    const res = await fetch(`/api/tags/${tag.id}`, { method: "DELETE" });
+    if (res.ok) {
+      setTags((prev) => prev.filter((t) => t.id !== tag.id));
+    }
+    setDeletingTagId(null);
+  }
 
   if (status === "loading" || !session) {
     return (
@@ -111,6 +187,88 @@ export default function SettingsPage() {
             <p className="text-xs mt-0.5">Set DATABASE_URL in .env and run: npx prisma db push</p>
           </div>
         </div>
+      </div>
+
+      {/* Tags Management */}
+      <div className="rounded-xl border border-brand-100 bg-white p-6 mt-6">
+        <h2 className="text-sm font-semibold mb-4">Tags</h2>
+        {tags.length === 0 ? (
+          <p className="text-sm text-zinc-400">No tags yet. Create tags from any contact page.</p>
+        ) : (
+          <div className="divide-y divide-brand-50">
+            {tags.map((tag) => (
+              <div key={tag.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
+                {editingTagId === tag.id ? (
+                  <div className="flex-1 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <input
+                        autoFocus
+                        type="text"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && saveTagEdit(tag.id)}
+                        className="flex-1 rounded-lg border border-brand-100 px-2.5 py-1.5 text-sm focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
+                      />
+                      <button
+                        onClick={() => saveTagEdit(tag.id)}
+                        disabled={!editName.trim()}
+                        className="rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-600 disabled:opacity-50"
+                      >
+                        Save
+                      </button>
+                      <button
+                        onClick={() => setEditingTagId(null)}
+                        className="rounded-lg border border-brand-100 px-3 py-1.5 text-xs hover:bg-brand-50"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                    <div className="flex gap-1.5 flex-wrap">
+                      {TAG_COLORS.map((c) => (
+                        <button
+                          key={c.value}
+                          onClick={() => setEditColor(c.value)}
+                          className="h-5 w-5 rounded-full border-2 transition-transform hover:scale-110"
+                          style={{
+                            backgroundColor: c.value,
+                            borderColor: editColor === c.value ? "#1e293b" : "transparent",
+                          }}
+                          title={c.label}
+                        />
+                      ))}
+                    </div>
+                    {tagError && <p className="text-xs text-red-600">{tagError}</p>}
+                  </div>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => startEditTag(tag)}
+                      className="h-4 w-4 rounded-full shrink-0 ring-2 ring-transparent hover:ring-zinc-300 transition-all"
+                      style={{ backgroundColor: tag.color }}
+                      title="Click to change color"
+                    />
+                    <button
+                      onClick={() => startEditTag(tag)}
+                      className="flex-1 text-sm text-left hover:text-brand-600"
+                    >
+                      {tag.name}
+                    </button>
+                    <span className="text-xs text-zinc-400 shrink-0">
+                      {tag._count.contacts} contact{tag._count.contacts !== 1 ? "s" : ""}
+                    </span>
+                    <button
+                      onClick={() => handleDeleteTag(tag)}
+                      disabled={deletingTagId === tag.id}
+                      className="shrink-0 rounded-lg border border-red-100 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+                    >
+                      {deletingTagId === tag.id ? "Deleting..." : "Delete"}
+                    </button>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -4,12 +4,19 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
+interface Tag {
+  id: string;
+  name: string;
+  color: string;
+}
+
 interface Contact {
   id: string;
   email: string | null;
   firstName: string | null;
   lastName: string | null;
   company: string | null;
+  tags: { tag: Tag }[];
 }
 
 interface Template {
@@ -28,7 +35,9 @@ export default function NewCampaignPage() {
   });
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
+  const [allTags, setAllTags] = useState<Tag[]>([]);
   const [selectedContacts, setSelectedContacts] = useState<string[]>([]);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -39,12 +48,64 @@ export default function NewCampaignPage() {
     if (!session) return;
     fetch("/api/contacts").then((r) => r.json()).then(setContacts);
     fetch("/api/templates").then((r) => r.json()).then(setTemplates);
+    fetch("/api/tags").then((r) => r.json()).then(setAllTags);
   }, [session]);
 
   function toggleContact(id: string) {
     setSelectedContacts((prev) =>
       prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]
     );
+  }
+
+  async function handleTagToggle(tagId: string) {
+    const isActive = selectedTags.includes(tagId);
+
+    if (!isActive) {
+      // Tag toggled ON: fetch contacts for this tag and merge into selectedContacts
+      setSelectedTags((prev) => [...prev, tagId]);
+      const res = await fetch(`/api/contacts?tagId=${tagId}`);
+      if (res.ok) {
+        const tagContacts: Contact[] = await res.json();
+        const newIds = tagContacts.map((c) => c.id);
+        setSelectedContacts((prev) => {
+          const merged = new Set([...prev, ...newIds]);
+          return Array.from(merged);
+        });
+      }
+    } else {
+      // Tag toggled OFF: remove contacts that are ONLY covered by this tag
+      const remainingTags = selectedTags.filter((id) => id !== tagId);
+      setSelectedTags(remainingTags);
+
+      if (remainingTags.length === 0) {
+        // No other tags active — remove all tag-sourced contacts (keep manually checked ones)
+        // We don't know which were manually checked vs tag-sourced, so keep all currently selected
+        // but remove contacts that have this tag and no other selected tags
+        setSelectedContacts((prev) =>
+          prev.filter((contactId) => {
+            const contact = contacts.find((c) => c.id === contactId);
+            if (!contact) return true;
+            const contactTagIds = contact.tags.map((ct) => ct.tag.id);
+            // Keep if it doesn't have the removed tag
+            return !contactTagIds.includes(tagId);
+          })
+        );
+      } else {
+        // Other tags still active — only remove contacts that had this tag but none of the remaining active tags
+        setSelectedContacts((prev) =>
+          prev.filter((contactId) => {
+            const contact = contacts.find((c) => c.id === contactId);
+            if (!contact) return true;
+            const contactTagIds = contact.tags.map((ct) => ct.tag.id);
+            // If contact has the removed tag but not any remaining active tag, remove it
+            const hadRemovedTag = contactTagIds.includes(tagId);
+            if (!hadRemovedTag) return true; // didn't come from this tag, keep
+            const coveredByOtherTag = remainingTags.some((t) => contactTagIds.includes(t));
+            return coveredByOtherTag;
+          })
+        );
+      }
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -125,6 +186,35 @@ export default function NewCampaignPage() {
           </div>
         </div>
 
+        {/* Select by Tag */}
+        {allTags.length > 0 && (
+          <div className="rounded-xl border border-brand-100 bg-white p-6">
+            <h2 className="text-sm font-semibold mb-1">Select by Tag</h2>
+            <p className="text-xs text-zinc-500 mb-3">Click a tag to add all contacts with that tag.</p>
+            <div className="flex flex-wrap gap-1.5">
+              {allTags.map((tag) => {
+                const active = selectedTags.includes(tag.id);
+                return (
+                  <button
+                    key={tag.id}
+                    type="button"
+                    onClick={() => handleTagToggle(tag.id)}
+                    className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium border transition-opacity"
+                    style={{
+                      backgroundColor: active ? tag.color : "transparent",
+                      borderColor: tag.color,
+                      color: active ? "white" : tag.color,
+                    }}
+                  >
+                    {active && <span className="text-white">✓</span>}
+                    {tag.name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <div className="rounded-xl border border-brand-100 bg-white p-6">
           <h2 className="text-sm font-semibold mb-3">Select Contacts ({selectedContacts.length} selected)</h2>
           {contacts.length === 0 ? (
@@ -142,9 +232,20 @@ export default function NewCampaignPage() {
                     onChange={() => toggleContact(contact.id)}
                     className="rounded border-brand-200 text-brand-500 focus:ring-brand-400"
                   />
-                  <div className="min-w-0">
-                    <div className="text-sm font-medium">
-                      {[contact.firstName, contact.lastName].filter(Boolean).join(" ") || "Unnamed"}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-sm font-medium">
+                        {[contact.firstName, contact.lastName].filter(Boolean).join(" ") || "Unnamed"}
+                      </span>
+                      {contact.tags.map(({ tag }) => (
+                        <span
+                          key={tag.id}
+                          className="rounded-full px-1.5 py-0.5 text-xs font-medium text-white"
+                          style={{ backgroundColor: tag.color }}
+                        >
+                          {tag.name}
+                        </span>
+                      ))}
                     </div>
                     <div className="text-xs text-zinc-500">
                       {contact.email || "No email"} {contact.company && `· ${contact.company}`}

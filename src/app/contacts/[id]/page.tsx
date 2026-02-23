@@ -2,8 +2,25 @@
 
 import { useSession } from "next-auth/react";
 import { useRouter, useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
+
+const TAG_COLORS = [
+  { label: "Indigo", value: "#6366f1" },
+  { label: "Violet", value: "#8b5cf6" },
+  { label: "Sky", value: "#0ea5e9" },
+  { label: "Teal", value: "#14b8a6" },
+  { label: "Emerald", value: "#10b981" },
+  { label: "Amber", value: "#f59e0b" },
+  { label: "Rose", value: "#f43f5e" },
+  { label: "Zinc", value: "#71717a" },
+];
+
+interface Tag {
+  id: string;
+  name: string;
+  color: string;
+}
 
 interface Contact {
   id: string;
@@ -27,6 +44,7 @@ interface Contact {
     status: string;
     campaign: { id: string; name: string };
   }[];
+  tags: { tag: Tag }[];
 }
 
 interface Thread {
@@ -52,6 +70,15 @@ export default function ContactDetailPage() {
   const [showGenerate, setShowGenerate] = useState(false);
   const [error, setError] = useState("");
 
+  // Tag state
+  const [allTags, setAllTags] = useState<Tag[]>([]);
+  const [showTagPopover, setShowTagPopover] = useState(false);
+  const [newTagName, setNewTagName] = useState("");
+  const [newTagColor, setNewTagColor] = useState(TAG_COLORS[0].value);
+  const [showCreateTag, setShowCreateTag] = useState(false);
+  const [tagError, setTagError] = useState("");
+  const popoverRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (status === "unauthenticated") router.replace("/");
   }, [status, router]);
@@ -60,7 +87,19 @@ export default function ContactDetailPage() {
     if (!session) return;
     fetchContact();
     fetchTemplates();
+    fetchAllTags();
   }, [session, contactId]);
+
+  // Close popover on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
+        setShowTagPopover(false);
+      }
+    }
+    if (showTagPopover) document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [showTagPopover]);
 
   async function fetchContact() {
     setLoading(true);
@@ -85,6 +124,12 @@ export default function ContactDetailPage() {
     const res = await fetch("/api/templates");
     const data = await res.json();
     if (Array.isArray(data)) setTemplates(data);
+  }
+
+  async function fetchAllTags() {
+    const res = await fetch("/api/tags");
+    const data = await res.json();
+    if (Array.isArray(data)) setAllTags(data);
   }
 
   async function handleEnrich() {
@@ -125,6 +170,68 @@ export default function ContactDetailPage() {
     router.replace("/contacts");
   }
 
+  async function handleAddTag(tagId: string) {
+    if (!contact) return;
+    // Optimistic update
+    const tag = allTags.find((t) => t.id === tagId);
+    if (!tag) return;
+    setContact((prev) => prev ? { ...prev, tags: [...prev.tags, { tag }] } : prev);
+    setShowTagPopover(false);
+
+    const res = await fetch(`/api/contacts/${contactId}/tags`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tagId }),
+    });
+    if (!res.ok) {
+      // Revert
+      fetchContact();
+    }
+  }
+
+  async function handleRemoveTag(tagId: string) {
+    if (!contact) return;
+    // Optimistic update
+    setContact((prev) =>
+      prev ? { ...prev, tags: prev.tags.filter((ct) => ct.tag.id !== tagId) } : prev
+    );
+
+    const res = await fetch(`/api/contacts/${contactId}/tags`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tagId }),
+    });
+    if (!res.ok) {
+      fetchContact();
+    }
+  }
+
+  async function handleCreateTag() {
+    if (!newTagName.trim()) return;
+    setTagError("");
+
+    const res = await fetch(`/api/contacts/${contactId}/tags`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: newTagName.trim(), color: newTagColor }),
+    });
+
+    if (res.ok) {
+      const newTag = await res.json();
+      setAllTags((prev) => [...prev, newTag].sort((a, b) => a.name.localeCompare(b.name)));
+      setContact((prev) =>
+        prev ? { ...prev, tags: [...prev.tags, { tag: newTag }] } : prev
+      );
+      setNewTagName("");
+      setNewTagColor(TAG_COLORS[0].value);
+      setShowCreateTag(false);
+      setShowTagPopover(false);
+    } else {
+      const data = await res.json();
+      setTagError(data.error || "Failed to create tag");
+    }
+  }
+
   if (status === "loading" || loading || !session) {
     return (
       <div className="flex h-[80vh] items-center justify-center">
@@ -137,6 +244,7 @@ export default function ContactDetailPage() {
 
   const name = [contact.firstName, contact.lastName].filter(Boolean).join(" ") || "Unnamed Contact";
   const linkedinProfile = contact.linkedinData as Record<string, unknown> | null;
+  const appliedTagIds = new Set(contact.tags.map((ct) => ct.tag.id));
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -296,6 +404,131 @@ export default function ContactDetailPage() {
 
         {/* Sidebar */}
         <div className="space-y-6">
+          {/* Tags */}
+          <div className="rounded-xl border border-brand-100 bg-white p-5">
+            <h2 className="text-sm font-semibold mb-3">Tags</h2>
+            <div className="flex flex-wrap gap-1.5 mb-3">
+              {contact.tags.map(({ tag }) => (
+                <span
+                  key={tag.id}
+                  className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium text-white"
+                  style={{ backgroundColor: tag.color }}
+                >
+                  {tag.name}
+                  <button
+                    onClick={() => handleRemoveTag(tag.id)}
+                    className="ml-0.5 opacity-75 hover:opacity-100 leading-none"
+                    aria-label={`Remove ${tag.name}`}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+              {contact.tags.length === 0 && (
+                <p className="text-xs text-zinc-400">No tags yet.</p>
+              )}
+            </div>
+
+            {/* Add Tag popover */}
+            <div className="relative" ref={popoverRef}>
+              <button
+                onClick={() => {
+                  setShowTagPopover(!showTagPopover);
+                  setShowCreateTag(false);
+                  setTagError("");
+                }}
+                className="text-xs text-brand-500 hover:text-brand-700 font-medium"
+              >
+                + Add Tag
+              </button>
+
+              {showTagPopover && (
+                <div className="absolute left-0 top-6 z-20 w-56 rounded-xl border border-brand-100 bg-white shadow-lg">
+                  {!showCreateTag ? (
+                    <>
+                      <div className="max-h-48 overflow-y-auto">
+                        {allTags.length === 0 ? (
+                          <p className="px-3 py-2 text-xs text-zinc-400">No tags yet.</p>
+                        ) : (
+                          allTags.map((tag) => (
+                            <button
+                              key={tag.id}
+                              onClick={() =>
+                                appliedTagIds.has(tag.id)
+                                  ? handleRemoveTag(tag.id)
+                                  : handleAddTag(tag.id)
+                              }
+                              className="flex w-full items-center gap-2 px-3 py-2 text-xs hover:bg-brand-50/50 text-left"
+                            >
+                              <span
+                                className="h-3 w-3 rounded-full shrink-0"
+                                style={{ backgroundColor: tag.color }}
+                              />
+                              <span className="flex-1">{tag.name}</span>
+                              {appliedTagIds.has(tag.id) && (
+                                <span className="text-brand-500">✓</span>
+                              )}
+                            </button>
+                          ))
+                        )}
+                      </div>
+                      <div className="border-t border-brand-50 p-2">
+                        <button
+                          onClick={() => setShowCreateTag(true)}
+                          className="w-full rounded-lg px-3 py-1.5 text-xs text-brand-600 hover:bg-brand-50 text-left font-medium"
+                        >
+                          + Create new tag
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="p-3 space-y-2">
+                      <input
+                        autoFocus
+                        type="text"
+                        value={newTagName}
+                        onChange={(e) => setNewTagName(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && handleCreateTag()}
+                        placeholder="Tag name"
+                        className="w-full rounded-lg border border-brand-100 px-2.5 py-1.5 text-xs focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
+                      />
+                      <div className="flex gap-1.5 flex-wrap">
+                        {TAG_COLORS.map((c) => (
+                          <button
+                            key={c.value}
+                            onClick={() => setNewTagColor(c.value)}
+                            className="h-5 w-5 rounded-full border-2 transition-transform hover:scale-110"
+                            style={{
+                              backgroundColor: c.value,
+                              borderColor: newTagColor === c.value ? "#1e293b" : "transparent",
+                            }}
+                            title={c.label}
+                          />
+                        ))}
+                      </div>
+                      {tagError && <p className="text-xs text-red-600">{tagError}</p>}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleCreateTag}
+                          disabled={!newTagName.trim()}
+                          className="flex-1 rounded-lg bg-brand-500 py-1.5 text-xs font-medium text-white hover:bg-brand-600 disabled:opacity-50"
+                        >
+                          Create
+                        </button>
+                        <button
+                          onClick={() => { setShowCreateTag(false); setTagError(""); }}
+                          className="flex-1 rounded-lg border border-brand-100 py-1.5 text-xs hover:bg-brand-50"
+                        >
+                          Back
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Drafts */}
           <div className="rounded-xl border border-brand-100 bg-white p-5">
             <h2 className="text-sm font-semibold mb-3">Email Drafts</h2>

@@ -8,6 +8,7 @@ export async function GET(req: NextRequest) {
 
   const search = req.nextUrl.searchParams.get("search") ?? "";
   const enriched = req.nextUrl.searchParams.get("enriched");
+  const tagIdParam = req.nextUrl.searchParams.get("tagId");
 
   const where: Record<string, unknown> = { userId: user.id };
 
@@ -26,11 +27,19 @@ export async function GET(req: NextRequest) {
     where.enrichedAt = null;
   }
 
+  if (tagIdParam) {
+    const tagIds = tagIdParam.split(",").filter(Boolean);
+    if (tagIds.length > 0) {
+      where.tags = { some: { tagId: { in: tagIds } } };
+    }
+  }
+
   const contacts = await prisma.contact.findMany({
     where,
     orderBy: { createdAt: "desc" },
     include: {
       _count: { select: { emailDrafts: true } },
+      tags: { include: { tag: true } },
     },
   });
 

@@ -5,6 +5,12 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 
+interface Tag {
+  id: string;
+  name: string;
+  color: string;
+}
+
 interface Contact {
   id: string;
   email: string | null;
@@ -16,6 +22,7 @@ interface Contact {
   enrichedAt: string | null;
   createdAt: string;
   _count: { emailDrafts: number };
+  tags: { tag: Tag }[];
 }
 
 function parseCsv(text: string): Record<string, string>[] {
@@ -90,6 +97,8 @@ export default function ContactsPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [allTags, setAllTags] = useState<Tag[]>([]);
+  const [activeTags, setActiveTags] = useState<string[]>([]);
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
@@ -118,16 +127,34 @@ export default function ContactsPage() {
   useEffect(() => {
     if (!session) return;
     fetchContacts();
+    fetchTags();
   }, [session]);
 
-  async function fetchContacts(q = "") {
+  async function fetchTags() {
+    const res = await fetch("/api/tags");
+    const data = await res.json();
+    if (Array.isArray(data)) setAllTags(data);
+  }
+
+  async function fetchContacts(q = "", tagIds: string[] = activeTags) {
     setLoading(true);
     const params = new URLSearchParams();
     if (q) params.set("search", q);
+    if (tagIds.length > 0) params.set("tagId", tagIds.join(","));
     const res = await fetch(`/api/contacts?${params}`);
     const data = await res.json();
     setContacts(data);
     setLoading(false);
+  }
+
+  function toggleTag(tagId: string) {
+    setActiveTags((prev) => {
+      const next = prev.includes(tagId)
+        ? prev.filter((id) => id !== tagId)
+        : [...prev, tagId];
+      fetchContacts(search, next);
+      return next;
+    });
   }
 
   async function handleCreate(e: React.FormEvent) {
@@ -148,7 +175,7 @@ export default function ContactsPage() {
     if (res.ok) {
       setForm({ email: "", linkedinUrl: "", firstName: "", lastName: "" });
       setShowForm(false);
-      fetchContacts();
+      fetchContacts(search);
     } else {
       const data = await res.json();
       setError(data.error || "Failed to create contact");
@@ -191,7 +218,7 @@ export default function ContactsPage() {
 
       if (res.ok) {
         setImportResult(data);
-        fetchContacts();
+        fetchContacts(search);
       } else {
         setError(data.error || "Import failed");
       }
@@ -342,7 +369,7 @@ export default function ContactsPage() {
         </form>
       )}
 
-      <form onSubmit={handleSearch} className="mb-4">
+      <form onSubmit={handleSearch} className="mb-3">
         <input
           type="text"
           value={search}
@@ -351,6 +378,40 @@ export default function ContactsPage() {
           className="w-full rounded-lg border border-brand-100 bg-white px-4 py-2.5 text-sm focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
         />
       </form>
+
+      {/* Tag filter bar */}
+      {allTags.length > 0 && (
+        <div className="mb-4 flex flex-wrap gap-1.5">
+          {allTags.map((tag) => {
+            const active = activeTags.includes(tag.id);
+            return (
+              <button
+                key={tag.id}
+                onClick={() => toggleTag(tag.id)}
+                className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium border transition-opacity"
+                style={{
+                  backgroundColor: active ? tag.color : "transparent",
+                  borderColor: tag.color,
+                  color: active ? "white" : tag.color,
+                }}
+              >
+                {tag.name}
+              </button>
+            );
+          })}
+          {activeTags.length > 0 && (
+            <button
+              onClick={() => {
+                setActiveTags([]);
+                fetchContacts(search, []);
+              }}
+              className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium border border-zinc-200 text-zinc-500 hover:bg-zinc-50"
+            >
+              Clear filters
+            </button>
+          )}
+        </div>
+      )}
 
       {loading ? (
         <div className="flex h-40 items-center justify-center">
@@ -369,7 +430,7 @@ export default function ContactsPage() {
               className="flex items-center justify-between px-5 py-4 hover:bg-brand-50/50 transition-colors"
             >
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-sm font-medium">
                     {[contact.firstName, contact.lastName].filter(Boolean).join(" ") || "Unnamed"}
                   </span>
@@ -378,6 +439,15 @@ export default function ContactsPage() {
                       Enriched
                     </span>
                   )}
+                  {contact.tags.map(({ tag }) => (
+                    <span
+                      key={tag.id}
+                      className="rounded-full px-2 py-0.5 text-xs font-medium text-white"
+                      style={{ backgroundColor: tag.color }}
+                    >
+                      {tag.name}
+                    </span>
+                  ))}
                 </div>
                 <div className="flex items-center gap-3 mt-0.5 text-xs text-zinc-500">
                   {contact.email && <span>{contact.email}</span>}

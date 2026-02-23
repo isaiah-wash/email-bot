@@ -21,6 +21,7 @@ export async function GET(
       campaignContacts: {
         include: { campaign: true },
       },
+      tags: { include: { tag: true } },
     },
   });
 
