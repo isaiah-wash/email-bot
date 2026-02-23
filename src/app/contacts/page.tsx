@@ -5,6 +5,17 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 
+const TAG_COLORS = [
+  { label: "Indigo", value: "#6366f1" },
+  { label: "Violet", value: "#8b5cf6" },
+  { label: "Sky", value: "#0ea5e9" },
+  { label: "Teal", value: "#14b8a6" },
+  { label: "Emerald", value: "#10b981" },
+  { label: "Amber", value: "#f59e0b" },
+  { label: "Rose", value: "#f43f5e" },
+  { label: "Zinc", value: "#71717a" },
+];
+
 interface Tag {
   id: string;
   name: string;
@@ -138,6 +149,14 @@ export default function ContactsPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
+  // Inline tag popover state (directory)
+  const [activeTagPopover, setActiveTagPopover] = useState<string | null>(null);
+  const [showCreateTagInDir, setShowCreateTagInDir] = useState(false);
+  const [dirTagName, setDirTagName] = useState("");
+  const [dirTagColor, setDirTagColor] = useState(TAG_COLORS[0].value);
+  const [dirTagError, setDirTagError] = useState("");
+  const tagPopoverRef = useRef<HTMLDivElement>(null);
+
   // CSV import state
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importing, setImporting] = useState(false);
@@ -184,6 +203,70 @@ export default function ContactsPage() {
       fetchContacts(search, next);
       return next;
     });
+  }
+
+  // Close directory tag popover on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (tagPopoverRef.current && !tagPopoverRef.current.contains(e.target as Node)) {
+        setActiveTagPopover(null);
+        setShowCreateTagInDir(false);
+      }
+    }
+    if (activeTagPopover) document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [activeTagPopover]);
+
+  async function handleDirAddTag(contactId: string, tagId: string) {
+    const tag = allTags.find((t) => t.id === tagId);
+    if (!tag) return;
+    setContacts((prev) =>
+      prev.map((c) => c.id === contactId ? { ...c, tags: [...c.tags, { tag }] } : c)
+    );
+    const res = await fetch(`/api/contacts/${contactId}/tags`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tagId }),
+    });
+    if (!res.ok) fetchContacts(search);
+  }
+
+  async function handleDirRemoveTag(contactId: string, tagId: string) {
+    setContacts((prev) =>
+      prev.map((c) =>
+        c.id === contactId ? { ...c, tags: c.tags.filter((ct) => ct.tag.id !== tagId) } : c
+      )
+    );
+    const res = await fetch(`/api/contacts/${contactId}/tags`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tagId }),
+    });
+    if (!res.ok) fetchContacts(search);
+  }
+
+  async function handleDirCreateTag(contactId: string) {
+    if (!dirTagName.trim()) return;
+    setDirTagError("");
+    const res = await fetch(`/api/contacts/${contactId}/tags`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: dirTagName.trim(), color: dirTagColor }),
+    });
+    if (res.ok) {
+      const newTag = await res.json();
+      setAllTags((prev) => [...prev, newTag].sort((a, b) => a.name.localeCompare(b.name)));
+      setContacts((prev) =>
+        prev.map((c) => c.id === contactId ? { ...c, tags: [...c.tags, { tag: newTag }] } : c)
+      );
+      setDirTagName("");
+      setDirTagColor(TAG_COLORS[0].value);
+      setShowCreateTagInDir(false);
+      setActiveTagPopover(null);
+    } else {
+      const data = await res.json();
+      setDirTagError(data.error || "Failed to create tag");
+    }
   }
 
   async function handleCreate(e: React.FormEvent) {
@@ -628,53 +711,179 @@ export default function ContactsPage() {
       ) : (
         <div className="rounded-xl border border-brand-100 bg-white divide-y divide-brand-50">
           {contacts.map((contact) => (
-            <Link
-              key={contact.id}
-              href={`/contacts/${contact.id}`}
-              className="flex items-center justify-between px-5 py-4 hover:bg-brand-50/50 transition-colors"
-            >
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm font-medium">
-                    {[contact.firstName, contact.lastName].filter(Boolean).join(" ") || "Unnamed"}
-                  </span>
-                  {contact.enrichedAt && (
-                    <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700">
-                      Enriched
+            <div key={contact.id} className="relative flex items-center px-5 py-4 hover:bg-brand-50/50 transition-colors">
+              <Link
+                href={`/contacts/${contact.id}`}
+                className="flex items-center justify-between flex-1 min-w-0"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-medium">
+                      {[contact.firstName, contact.lastName].filter(Boolean).join(" ") || "Unnamed"}
                     </span>
+                    {contact.enrichedAt && (
+                      <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700">
+                        Enriched
+                      </span>
+                    )}
+                    {contact.tags.map(({ tag }) => (
+                      <span
+                        key={tag.id}
+                        className="rounded-full px-2 py-0.5 text-xs font-medium text-white"
+                        style={{ backgroundColor: tag.color }}
+                      >
+                        {tag.name}
+                      </span>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-3 mt-0.5 text-xs text-zinc-500">
+                    {contact.email && <span>{contact.email}</span>}
+                    {contact.company && <span>{contact.company}</span>}
+                    {contact.title && <span>{contact.title}</span>}
+                  </div>
+                </div>
+                <div className="ml-4 flex items-center gap-3 shrink-0">
+                  {contact.linkedinUrl && (
+                    <span className="rounded bg-brand-50 px-1.5 py-0.5 text-xs text-brand-600">LI</span>
                   )}
-                  {contact.tags.map(({ tag }) => (
-                    <span
-                      key={tag.id}
-                      className="rounded-full px-2 py-0.5 text-xs font-medium text-white"
-                      style={{ backgroundColor: tag.color }}
-                    >
-                      {tag.name}
-                    </span>
-                  ))}
+                  <span className="text-xs text-zinc-400">{contact._count.emailDrafts} drafts</span>
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    className="text-brand-200"
+                  >
+                    <path d="M6 4L10 8L6 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
                 </div>
-                <div className="flex items-center gap-3 mt-0.5 text-xs text-zinc-500">
-                  {contact.email && <span>{contact.email}</span>}
-                  {contact.company && <span>{contact.company}</span>}
-                  {contact.title && <span>{contact.title}</span>}
-                </div>
-              </div>
-              <div className="ml-4 flex items-center gap-3 shrink-0">
-                {contact.linkedinUrl && (
-                  <span className="rounded bg-brand-50 px-1.5 py-0.5 text-xs text-brand-600">LI</span>
-                )}
-                <span className="text-xs text-zinc-400">{contact._count.emailDrafts} drafts</span>
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 16 16"
-                  fill="none"
-                  className="text-brand-200"
+              </Link>
+
+              {/* Inline tag button */}
+              <div
+                className="relative ml-3 shrink-0"
+                ref={activeTagPopover === contact.id ? tagPopoverRef : null}
+              >
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (activeTagPopover === contact.id) {
+                      setActiveTagPopover(null);
+                    } else {
+                      setActiveTagPopover(contact.id);
+                      setShowCreateTagInDir(false);
+                      setDirTagError("");
+                      setDirTagName("");
+                    }
+                  }}
+                  className="rounded-full border border-brand-100 px-2 py-0.5 text-xs text-zinc-400 hover:text-brand-500 hover:border-brand-300 transition-colors"
+                  title="Add tag"
                 >
-                  <path d="M6 4L10 8L6 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
+                  + Tag
+                </button>
+
+                {activeTagPopover === contact.id && (
+                  <div className="absolute right-0 top-7 z-20 w-56 rounded-xl border border-brand-100 bg-white shadow-lg">
+                    {!showCreateTagInDir ? (
+                      <>
+                        <div className="max-h-48 overflow-y-auto">
+                          {allTags.length === 0 ? (
+                            <p className="px-3 py-2 text-xs text-zinc-400">No tags yet.</p>
+                          ) : (
+                            allTags.map((tag) => {
+                              const applied = contact.tags.some((ct) => ct.tag.id === tag.id);
+                              return (
+                                <button
+                                  key={tag.id}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    applied
+                                      ? handleDirRemoveTag(contact.id, tag.id)
+                                      : handleDirAddTag(contact.id, tag.id);
+                                  }}
+                                  className="flex w-full items-center gap-2 px-3 py-2 text-xs hover:bg-brand-50/50 text-left"
+                                >
+                                  <span
+                                    className="h-3 w-3 rounded-full shrink-0"
+                                    style={{ backgroundColor: tag.color }}
+                                  />
+                                  <span className="flex-1">{tag.name}</span>
+                                  {applied && <span className="text-brand-500">✓</span>}
+                                </button>
+                              );
+                            })
+                          )}
+                        </div>
+                        <div className="border-t border-brand-50 p-2">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setShowCreateTagInDir(true);
+                            }}
+                            className="w-full rounded-lg px-3 py-1.5 text-xs text-brand-600 hover:bg-brand-50 text-left font-medium"
+                          >
+                            + Create new tag
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="p-3 space-y-2">
+                        <input
+                          autoFocus
+                          type="text"
+                          value={dirTagName}
+                          onChange={(e) => setDirTagName(e.target.value)}
+                          onKeyDown={(e) => e.key === "Enter" && handleDirCreateTag(contact.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          placeholder="Tag name"
+                          className="w-full rounded-lg border border-brand-100 px-2.5 py-1.5 text-xs focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
+                        />
+                        <div className="flex gap-1.5 flex-wrap">
+                          {TAG_COLORS.map((c) => (
+                            <button
+                              key={c.value}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDirTagColor(c.value);
+                              }}
+                              className="h-5 w-5 rounded-full border-2 transition-transform hover:scale-110"
+                              style={{
+                                backgroundColor: c.value,
+                                borderColor: dirTagColor === c.value ? "#1e293b" : "transparent",
+                              }}
+                              title={c.label}
+                            />
+                          ))}
+                        </div>
+                        {dirTagError && <p className="text-xs text-red-600">{dirTagError}</p>}
+                        <div className="flex gap-2">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDirCreateTag(contact.id);
+                            }}
+                            disabled={!dirTagName.trim()}
+                            className="flex-1 rounded-lg bg-brand-500 py-1.5 text-xs font-medium text-white hover:bg-brand-600 disabled:opacity-50"
+                          >
+                            Create
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setShowCreateTagInDir(false);
+                              setDirTagError("");
+                            }}
+                            className="flex-1 rounded-lg border border-brand-100 py-1.5 text-xs hover:bg-brand-50"
+                          >
+                            Back
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-            </Link>
+            </div>
           ))}
         </div>
       )}
