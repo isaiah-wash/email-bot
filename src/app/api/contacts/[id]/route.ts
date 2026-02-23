@@ -41,7 +41,7 @@ export async function PATCH(
 
   const { id } = await params;
   const body = await req.json();
-  const { email, linkedinUrl, firstName, lastName } = body;
+  const { email, linkedinUrl, firstName, lastName, company, title } = body;
 
   const existing = await prisma.contact.findFirst({
     where: { id, userId: user.id },
@@ -58,6 +58,8 @@ export async function PATCH(
       ...(linkedinUrl !== undefined && { linkedinUrl: linkedinUrl || null }),
       ...(firstName !== undefined && { firstName: firstName || null }),
       ...(lastName !== undefined && { lastName: lastName || null }),
+      ...(company !== undefined && { company: company || null }),
+      ...(title !== undefined && { title: title || null }),
     },
   });
 

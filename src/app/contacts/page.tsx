@@ -25,6 +25,33 @@ interface Contact {
   tags: { tag: Tag }[];
 }
 
+interface ExistingContact {
+  id: string;
+  email: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  company: string | null;
+  title: string | null;
+}
+
+interface CsvContactRaw {
+  email: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  linkedinUrl: string | null;
+}
+
+interface DuplicateEntry {
+  csvContact: CsvContactRaw;
+  existingContact: ExistingContact;
+}
+
+interface DuplicatePending {
+  duplicates: DuplicateEntry[];
+  allContacts: { email: string; firstName: string; lastName: string; linkedinUrl: string }[];
+  errors: string[];
+}
+
 function parseCsv(text: string): Record<string, string>[] {
   const lines = text.split(/\r?\n/).filter((l) => l.trim());
   if (lines.length < 2) return [];
@@ -119,6 +146,8 @@ export default function ContactsPage() {
     skipped: number;
     errors: string[];
   } | null>(null);
+  const [duplicatePending, setDuplicatePending] = useState<DuplicatePending | null>(null);
+  const [resolutions, setResolutions] = useState<Record<string, "update" | "create">>({});
 
   useEffect(() => {
     if (status === "unauthenticated") router.replace("/");
@@ -206,19 +235,33 @@ export default function ContactsPage() {
         return;
       }
 
-      const contacts = rows.map(mapCsvRow);
+      const csvContacts = rows.map(mapCsvRow);
 
       const res = await fetch("/api/contacts/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contacts }),
+        body: JSON.stringify({ contacts: csvContacts }),
       });
 
       const data = await res.json();
 
       if (res.ok) {
-        setImportResult(data);
-        fetchContacts(search);
+        if (data.requiresResolution) {
+          // Pre-select "Replace Existing" for all duplicates
+          const defaultResolutions: Record<string, "update" | "create"> = {};
+          for (const dup of data.duplicates as DuplicateEntry[]) {
+            if (dup.csvContact.email) defaultResolutions[dup.csvContact.email] = "update";
+          }
+          setResolutions(defaultResolutions);
+          setDuplicatePending({
+            duplicates: data.duplicates,
+            allContacts: csvContacts,
+            errors: data.errors,
+          });
+        } else {
+          setImportResult(data);
+          fetchContacts(search);
+        }
       } else {
         setError(data.error || "Import failed");
       }
@@ -227,8 +270,35 @@ export default function ContactsPage() {
     }
 
     setImporting(false);
-    // Reset the file input so the same file can be re-selected
     if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  async function handleDuplicateResolution() {
+    if (!duplicatePending) return;
+    setImporting(true);
+    try {
+      const res = await fetch("/api/contacts/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contacts: duplicatePending.allContacts, resolutions }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setImportResult(data);
+        setDuplicatePending(null);
+        setResolutions({});
+        fetchContacts(search);
+      } else {
+        setError(data.error || "Import failed");
+        setDuplicatePending(null);
+        setResolutions({});
+      }
+    } catch {
+      setError("Failed to complete import");
+      setDuplicatePending(null);
+      setResolutions({});
+    }
+    setImporting(false);
   }
 
   if (status === "loading" || !session) {
@@ -410,6 +480,140 @@ export default function ContactsPage() {
               Clear filters
             </button>
           )}
+        </div>
+      )}
+
+      {/* Duplicate resolution modal */}
+      {duplicatePending && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-2xl rounded-2xl bg-white shadow-xl flex flex-col max-h-[90vh]">
+            <div className="p-6 pb-4">
+              <h2 className="text-lg font-semibold">Duplicate Contacts Found</h2>
+              <p className="mt-1 text-sm text-zinc-500">
+                {duplicatePending.duplicates.length} email
+                {duplicatePending.duplicates.length !== 1 ? "s" : ""} in your CSV already
+                exist in your contacts. Choose how to handle each one.
+              </p>
+            </div>
+
+            <div className="px-6 pb-2 flex gap-3">
+              <button
+                onClick={() => {
+                  const all: Record<string, "update" | "create"> = {};
+                  duplicatePending.duplicates.forEach((d) => {
+                    if (d.csvContact.email) all[d.csvContact.email] = "update";
+                  });
+                  setResolutions(all);
+                }}
+                className="text-xs text-zinc-500 hover:text-zinc-800 underline underline-offset-2"
+              >
+                Replace all
+              </button>
+              <span className="text-xs text-zinc-300">|</span>
+              <button
+                onClick={() => {
+                  const all: Record<string, "update" | "create"> = {};
+                  duplicatePending.duplicates.forEach((d) => {
+                    if (d.csvContact.email) all[d.csvContact.email] = "create";
+                  });
+                  setResolutions(all);
+                }}
+                className="text-xs text-zinc-500 hover:text-zinc-800 underline underline-offset-2"
+              >
+                Create all as new
+              </button>
+            </div>
+
+            <div className="px-6 overflow-y-auto flex-1 space-y-3 py-2">
+              {duplicatePending.duplicates.map((dup) => {
+                const email = dup.csvContact.email!;
+                const resolution = resolutions[email] ?? "update";
+                const existingName =
+                  [dup.existingContact.firstName, dup.existingContact.lastName]
+                    .filter(Boolean)
+                    .join(" ") || "Unnamed";
+                const csvName =
+                  [dup.csvContact.firstName, dup.csvContact.lastName]
+                    .filter(Boolean)
+                    .join(" ") || "Unnamed";
+                return (
+                  <div key={email} className="rounded-xl border border-brand-100 p-4">
+                    <p className="text-sm font-medium text-zinc-700 mb-3">{email}</p>
+                    <div className="grid grid-cols-2 gap-3 mb-3">
+                      <div className="rounded-lg bg-zinc-50 p-3 text-xs text-zinc-500">
+                        <p className="font-medium text-zinc-600 mb-1">Existing</p>
+                        <p>{existingName}</p>
+                        {dup.existingContact.title && <p>{dup.existingContact.title}</p>}
+                        {dup.existingContact.company && <p>{dup.existingContact.company}</p>}
+                      </div>
+                      <div className="rounded-lg bg-brand-50/50 p-3 text-xs text-zinc-500">
+                        <p className="font-medium text-zinc-600 mb-1">From CSV</p>
+                        <p>{csvName}</p>
+                        {dup.csvContact.linkedinUrl && (
+                          <p className="text-brand-500">Includes LinkedIn</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() =>
+                          setResolutions((prev) => ({ ...prev, [email]: "update" }))
+                        }
+                        className={`flex-1 rounded-lg py-1.5 text-xs font-medium transition-colors ${
+                          resolution === "update"
+                            ? "bg-brand-500 text-white"
+                            : "border border-brand-100 text-zinc-600 hover:bg-brand-50/50"
+                        }`}
+                      >
+                        Replace Existing
+                      </button>
+                      <button
+                        onClick={() =>
+                          setResolutions((prev) => ({ ...prev, [email]: "create" }))
+                        }
+                        className={`flex-1 rounded-lg py-1.5 text-xs font-medium transition-colors ${
+                          resolution === "create"
+                            ? "bg-brand-500 text-white"
+                            : "border border-brand-100 text-zinc-600 hover:bg-brand-50/50"
+                        }`}
+                      >
+                        Create New Contact
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {duplicatePending.errors.length > 0 && (
+              <div className="px-6 pt-2">
+                <p className="text-xs text-amber-600">
+                  {duplicatePending.errors.length} row
+                  {duplicatePending.errors.length !== 1 ? "s" : ""} skipped due to
+                  validation errors.
+                </p>
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-2 p-6 pt-4 border-t border-brand-50">
+              <button
+                onClick={() => {
+                  setDuplicatePending(null);
+                  setResolutions({});
+                }}
+                className="rounded-lg border border-brand-100 px-4 py-2 text-sm text-zinc-700 hover:bg-brand-50/50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDuplicateResolution}
+                disabled={importing}
+                className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 transition-colors disabled:opacity-50"
+              >
+                {importing ? "Importing..." : "Continue Import"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

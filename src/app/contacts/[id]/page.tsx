@@ -70,6 +70,18 @@ export default function ContactDetailPage() {
   const [showGenerate, setShowGenerate] = useState(false);
   const [error, setError] = useState("");
 
+  // Edit state
+  const [editing, setEditing] = useState(false);
+  const [editForm, setEditForm] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    linkedinUrl: "",
+    company: "",
+    title: "",
+  });
+  const [saving, setSaving] = useState(false);
+
   // Tag state
   const [allTags, setAllTags] = useState<Tag[]>([]);
   const [showTagPopover, setShowTagPopover] = useState(false);
@@ -168,6 +180,38 @@ export default function ContactDetailPage() {
     if (!confirm("Delete this contact and all associated data?")) return;
     await fetch(`/api/contacts/${contactId}`, { method: "DELETE" });
     router.replace("/contacts");
+  }
+
+  function startEditing() {
+    if (!contact) return;
+    setEditForm({
+      firstName: contact.firstName || "",
+      lastName: contact.lastName || "",
+      email: contact.email || "",
+      linkedinUrl: contact.linkedinUrl || "",
+      company: contact.company || "",
+      title: contact.title || "",
+    });
+    setEditing(true);
+  }
+
+  async function handleSaveEdit() {
+    setSaving(true);
+    setError("");
+    const res = await fetch(`/api/contacts/${contactId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(editForm),
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      setContact((prev) => prev ? { ...prev, ...updated } : prev);
+      setEditing(false);
+    } else {
+      const data = await res.json();
+      setError(data.error || "Failed to save changes");
+    }
+    setSaving(false);
   }
 
   async function handleAddTag(tagId: string) {
@@ -270,13 +314,19 @@ export default function ContactDetailPage() {
           <div className="rounded-xl border border-brand-100 bg-white p-6">
             <div className="flex items-start justify-between">
               <div>
-                <h1 className="text-xl font-semibold">{name}</h1>
-                {contact.title && contact.company && (
-                  <p className="text-sm text-zinc-500 mt-0.5">{contact.title} at {contact.company}</p>
+                {!editing && (
+                  <>
+                    <h1 className="text-xl font-semibold">{name}</h1>
+                    {(contact.title || contact.company) && (
+                      <p className="text-sm text-zinc-500 mt-0.5">
+                        {[contact.title, contact.company].filter(Boolean).join(" at ")}
+                      </p>
+                    )}
+                  </>
                 )}
               </div>
               <div className="flex items-center gap-2">
-                {contact.linkedinUrl && (
+                {!editing && contact.linkedinUrl && (
                   <button
                     onClick={handleEnrich}
                     disabled={enriching}
@@ -285,22 +335,50 @@ export default function ContactDetailPage() {
                     {enriching ? "Enriching..." : contact.enrichedAt ? "Re-enrich from LinkedIn" : "Enrich from LinkedIn"}
                   </button>
                 )}
-                <button
-                  onClick={() => setShowGenerate(!showGenerate)}
-                  className="rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-600"
-                >
-                  Generate Email
-                </button>
-                <button
-                  onClick={handleDelete}
-                  className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
-                >
-                  Delete
-                </button>
+                {!editing && (
+                  <button
+                    onClick={() => setShowGenerate(!showGenerate)}
+                    className="rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-600"
+                  >
+                    Generate Email
+                  </button>
+                )}
+                {editing ? (
+                  <>
+                    <button
+                      onClick={handleSaveEdit}
+                      disabled={saving}
+                      className="rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-600 disabled:opacity-50"
+                    >
+                      {saving ? "Saving..." : "Save"}
+                    </button>
+                    <button
+                      onClick={() => setEditing(false)}
+                      className="rounded-lg border border-brand-100 px-3 py-1.5 text-xs font-medium hover:bg-brand-50"
+                    >
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={startEditing}
+                    className="rounded-lg border border-brand-100 px-3 py-1.5 text-xs font-medium hover:bg-brand-50"
+                  >
+                    Edit
+                  </button>
+                )}
+                {!editing && (
+                  <button
+                    onClick={handleDelete}
+                    className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
+                  >
+                    Delete
+                  </button>
+                )}
               </div>
             </div>
 
-            {showGenerate && (
+            {!editing && showGenerate && (
               <div className="mt-4 flex items-center gap-3 rounded-lg border border-brand-100 bg-brand-50/50 p-4">
                 <select
                   value={selectedTemplate}
@@ -322,32 +400,91 @@ export default function ContactDetailPage() {
               </div>
             )}
 
-            <div className="mt-6 grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <span className="text-zinc-500">Email</span>
-                <p className="mt-0.5 font-medium">{contact.email || "—"}</p>
+            {editing ? (
+              <div className="mt-4 grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-zinc-500 mb-1">First Name</label>
+                  <input
+                    type="text"
+                    value={editForm.firstName}
+                    onChange={(e) => setEditForm({ ...editForm, firstName: e.target.value })}
+                    className="w-full rounded-lg border border-brand-100 px-3 py-2 text-sm focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-zinc-500 mb-1">Last Name</label>
+                  <input
+                    type="text"
+                    value={editForm.lastName}
+                    onChange={(e) => setEditForm({ ...editForm, lastName: e.target.value })}
+                    className="w-full rounded-lg border border-brand-100 px-3 py-2 text-sm focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-zinc-500 mb-1">Email</label>
+                  <input
+                    type="email"
+                    value={editForm.email}
+                    onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                    className="w-full rounded-lg border border-brand-100 px-3 py-2 text-sm focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-zinc-500 mb-1">LinkedIn URL</label>
+                  <input
+                    type="url"
+                    value={editForm.linkedinUrl}
+                    onChange={(e) => setEditForm({ ...editForm, linkedinUrl: e.target.value })}
+                    className="w-full rounded-lg border border-brand-100 px-3 py-2 text-sm focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-zinc-500 mb-1">Company</label>
+                  <input
+                    type="text"
+                    value={editForm.company}
+                    onChange={(e) => setEditForm({ ...editForm, company: e.target.value })}
+                    className="w-full rounded-lg border border-brand-100 px-3 py-2 text-sm focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-zinc-500 mb-1">Title</label>
+                  <input
+                    type="text"
+                    value={editForm.title}
+                    onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                    className="w-full rounded-lg border border-brand-100 px-3 py-2 text-sm focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
+                  />
+                </div>
               </div>
-              <div>
-                <span className="text-zinc-500">LinkedIn</span>
-                <p className="mt-0.5 font-medium">
-                  {contact.linkedinUrl ? (
-                    <a href={contact.linkedinUrl} target="_blank" rel="noopener" className="text-brand-500 hover:underline">
-                      Profile
-                    </a>
-                  ) : "—"}
-                </p>
+            ) : (
+              <div className="mt-6 grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="text-zinc-500">Email</span>
+                  <p className="mt-0.5 font-medium">{contact.email || "—"}</p>
+                </div>
+                <div>
+                  <span className="text-zinc-500">LinkedIn</span>
+                  <p className="mt-0.5 font-medium">
+                    {contact.linkedinUrl ? (
+                      <a href={contact.linkedinUrl} target="_blank" rel="noopener" className="text-brand-500 hover:underline">
+                        Profile
+                      </a>
+                    ) : "—"}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-zinc-500">Company</span>
+                  <p className="mt-0.5 font-medium">{contact.company || "—"}</p>
+                </div>
+                <div>
+                  <span className="text-zinc-500">Title</span>
+                  <p className="mt-0.5 font-medium">{contact.title || "—"}</p>
+                </div>
               </div>
-              <div>
-                <span className="text-zinc-500">Company</span>
-                <p className="mt-0.5 font-medium">{contact.company || "—"}</p>
-              </div>
-              <div>
-                <span className="text-zinc-500">Title</span>
-                <p className="mt-0.5 font-medium">{contact.title || "—"}</p>
-              </div>
-            </div>
+            )}
 
-            {contact.enrichedAt && (
+            {!editing && contact.enrichedAt && (
               <p className="mt-4 text-xs text-zinc-400">
                 Enriched on {new Date(contact.enrichedAt).toLocaleDateString()}
               </p>
