@@ -4,6 +4,27 @@ import { getAuthenticatedUser, unauthorized } from "@/lib/session";
 import { generateEmailDraft } from "@/lib/claude";
 import { fetchThreadsForContact } from "@/lib/gmail";
 
+export const maxDuration = 300; // 5 minutes — required for large campaigns
+
+async function runWithConcurrency<T>(
+  tasks: (() => Promise<T>)[],
+  concurrency: number
+): Promise<T[]> {
+  const results: T[] = [];
+  let index = 0;
+
+  async function worker() {
+    while (index < tasks.length) {
+      const i = index++;
+      results[i] = await tasks[i]();
+    }
+  }
+
+  const workers = Array.from({ length: Math.min(concurrency, tasks.length) }, worker);
+  await Promise.all(workers);
+  return results;
+}
+
 export async function POST(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -38,9 +59,7 @@ export async function POST(
     );
   }
 
-  const results: { contactId: string; success: boolean; error?: string }[] = [];
-
-  for (const cc of campaign.contacts) {
+  const tasks = campaign.contacts.map((cc) => async () => {
     try {
       // Fetch email history if contact has email
       let emailHistory: {
@@ -82,8 +101,8 @@ export async function POST(
         linkedinData:
           (cc.contact.linkedinData as Record<string, unknown>) ?? undefined,
         emailHistory,
-        templateSubject: campaign.template.subjectTemplate,
-        templateInstructions: campaign.template.bodyInstructions,
+        templateSubject: campaign.template!.subjectTemplate,
+        templateInstructions: campaign.template!.bodyInstructions,
         campaignContext: campaign.context ?? undefined,
       });
 
@@ -106,15 +125,17 @@ export async function POST(
         data: { status: "DRAFT_READY" },
       });
 
-      results.push({ contactId: cc.contactId, success: true });
+      return { contactId: cc.contactId, success: true } as const;
     } catch (error) {
-      results.push({
+      return {
         contactId: cc.contactId,
         success: false,
         error: error instanceof Error ? error.message : "Generation failed",
-      });
+      } as const;
     }
-  }
+  });
+
+  const results = await runWithConcurrency(tasks, 5);
 
   // Update campaign status to ACTIVE
   await prisma.campaign.update({
