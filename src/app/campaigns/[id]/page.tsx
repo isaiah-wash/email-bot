@@ -45,6 +45,8 @@ export default function CampaignDetailPage() {
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [sendingAll, setSendingAll] = useState(false);
+  const [sendAllResult, setSendAllResult] = useState<{ sent: number; failed: number } | null>(null);
   const [templates, setTemplates] = useState<TemplateOption[]>([]);
   const [updatingTemplate, setUpdatingTemplate] = useState(false);
 
@@ -90,6 +92,19 @@ export default function CampaignDetailPage() {
       await fetchCampaign();
     }
     setUpdatingTemplate(false);
+  }
+
+  async function handleSendAll() {
+    if (!confirm(`Send all ${draftReadyCount} draft emails now without reviewing? This cannot be undone.`)) return;
+    setSendingAll(true);
+    setSendAllResult(null);
+    const res = await fetch(`/api/campaigns/${campaignId}/send-all`, { method: "POST" });
+    if (res.ok) {
+      const data = await res.json();
+      setSendAllResult({ sent: data.sent, failed: data.failed });
+      fetchCampaign();
+    }
+    setSendingAll(false);
   }
 
   async function handleDelete() {
@@ -144,6 +159,15 @@ export default function CampaignDetailPage() {
               {generating ? "Generating..." : `Generate Drafts (${pendingCount})`}
             </button>
           )}
+          {draftReadyCount > 0 && (
+            <button
+              onClick={handleSendAll}
+              disabled={sendingAll}
+              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+            >
+              {sendingAll ? "Sending..." : `Send All (${draftReadyCount})`}
+            </button>
+          )}
           <button
             onClick={handleDelete}
             className="rounded-lg border border-red-200 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
@@ -152,6 +176,20 @@ export default function CampaignDetailPage() {
           </button>
         </div>
       </div>
+
+      {sendAllResult && (
+        <div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 p-4 flex items-center justify-between">
+          <p className="text-sm text-emerald-800">
+            <span className="font-medium">{sendAllResult.sent}</span> email{sendAllResult.sent !== 1 ? "s" : ""} sent
+            {sendAllResult.failed > 0 && (
+              <span className="ml-2 text-amber-700">· {sendAllResult.failed} failed</span>
+            )}
+          </p>
+          <button onClick={() => setSendAllResult(null)} className="text-emerald-600 hover:text-emerald-800 text-sm">
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4 mb-6">
