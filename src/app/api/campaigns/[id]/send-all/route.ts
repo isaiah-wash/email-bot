@@ -3,6 +3,13 @@ import { prisma } from "@/lib/prisma";
 import { getAuthenticatedUser, unauthorized } from "@/lib/session";
 import { sendEmail } from "@/lib/gmail";
 
+function injectTrackingPixel(htmlBody: string, draftId: string, baseUrl: string): string {
+  const pixel = `<img src="${baseUrl}/api/track/open?draftId=${draftId}" width="1" height="1" style="display:none;border:0" alt="" />`;
+  return htmlBody.includes("</body>")
+    ? htmlBody.replace("</body>", `${pixel}</body>`)
+    : htmlBody + pixel;
+}
+
 export const maxDuration = 300;
 
 async function runWithConcurrency<T>(
@@ -54,6 +61,10 @@ export async function POST(
     return NextResponse.json({ sent: 0, failed: 0, results: [] });
   }
 
+  const baseUrl =
+    process.env.NEXTAUTH_URL ??
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
+
   const tasks = campaignContacts.map((cc) => async () => {
     const draft = cc.drafts[0];
 
@@ -66,11 +77,13 @@ export async function POST(
     }
 
     try {
+      const bodyWithPixel = injectTrackingPixel(draft.body, draft.id, baseUrl);
+
       const result = await sendEmail(
         user.id,
         cc.contact.email,
         draft.subject,
-        draft.body
+        bodyWithPixel
       );
 
       await prisma.emailDraft.update({

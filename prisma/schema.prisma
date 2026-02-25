@@ -122,6 +122,7 @@ model EmailDraft {
   body              String      @db.Text
   generationContext  Json?
   status            DraftStatus @default(GENERATED)
+  openedAt          DateTime?
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt
 
