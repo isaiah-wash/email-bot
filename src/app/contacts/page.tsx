@@ -157,6 +157,12 @@ export default function ContactsPage() {
   const [dirTagError, setDirTagError] = useState("");
   const tagPopoverRef = useRef<HTMLDivElement>(null);
 
+  // Tag All state
+  const [showTagAll, setShowTagAll] = useState(false);
+  const [tagAllId, setTagAllId] = useState("");
+  const [taggingAll, setTaggingAll] = useState(false);
+  const tagAllRef = useRef<HTMLDivElement>(null);
+
   // CSV import state
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importing, setImporting] = useState(false);
@@ -216,6 +222,34 @@ export default function ContactsPage() {
     if (activeTagPopover) document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, [activeTagPopover]);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (tagAllRef.current && !tagAllRef.current.contains(e.target as Node)) {
+        setShowTagAll(false);
+      }
+    }
+    if (showTagAll) document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [showTagAll]);
+
+  async function handleTagAll() {
+    if (!tagAllId) return;
+    setTaggingAll(true);
+    await Promise.all(
+      contacts.map((contact) =>
+        fetch(`/api/contacts/${contact.id}/tags`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tagId: tagAllId }),
+        })
+      )
+    );
+    setTaggingAll(false);
+    setShowTagAll(false);
+    setTagAllId("");
+    fetchContacts(search);
+  }
 
   async function handleDirAddTag(contactId: string, tagId: string) {
     const tag = allTags.find((t) => t.id === tagId);
@@ -414,6 +448,46 @@ export default function ContactsPage() {
           >
             {importing ? "Importing..." : "Import CSV"}
           </button>
+          {/* Tag All popover */}
+          {allTags.length > 0 && contacts.length > 0 && (
+            <div className="relative" ref={tagAllRef}>
+              <button
+                onClick={() => {
+                  setShowTagAll((v) => !v);
+                  setTagAllId("");
+                }}
+                className="rounded-lg border border-brand-100 bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-brand-50/50 transition-colors"
+              >
+                Tag All
+              </button>
+              {showTagAll && (
+                <div className="absolute right-0 top-10 z-20 w-60 rounded-xl border border-brand-100 bg-white shadow-lg p-3 space-y-2">
+                  <p className="text-xs text-zinc-500">
+                    Apply a tag to all {contacts.length} visible contact{contacts.length !== 1 ? "s" : ""}
+                  </p>
+                  <select
+                    value={tagAllId}
+                    onChange={(e) => setTagAllId(e.target.value)}
+                    className="w-full rounded-lg border border-brand-100 bg-white px-2.5 py-1.5 text-sm focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
+                  >
+                    <option value="">Select a tag...</option>
+                    {allTags.map((tag) => (
+                      <option key={tag.id} value={tag.id}>
+                        {tag.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={handleTagAll}
+                    disabled={!tagAllId || taggingAll}
+                    className="w-full rounded-lg bg-brand-500 py-1.5 text-xs font-medium text-white hover:bg-brand-600 disabled:opacity-50 transition-colors"
+                  >
+                    {taggingAll ? "Applying..." : "Apply Tag"}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
           <button
             onClick={() => setShowForm(!showForm)}
             className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 transition-colors"

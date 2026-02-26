@@ -57,6 +57,14 @@ export default function NewCampaignPage() {
     );
   }
 
+  function handleSelectAll() {
+    if (selectedContacts.length === contacts.length && contacts.length > 0) {
+      setSelectedContacts([]);
+    } else {
+      setSelectedContacts(contacts.map((c) => c.id));
+    }
+  }
+
   async function handleTagToggle(tagId: string) {
     const isActive = selectedTags.includes(tagId);
 
@@ -216,7 +224,20 @@ export default function NewCampaignPage() {
         )}
 
         <div className="rounded-xl border border-brand-100 bg-white p-6">
-          <h2 className="text-sm font-semibold mb-3">Select Contacts ({selectedContacts.length} selected)</h2>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-semibold">Select Contacts ({selectedContacts.length} selected)</h2>
+            {contacts.length > 0 && (
+              <button
+                type="button"
+                onClick={handleSelectAll}
+                className="text-xs font-medium text-brand-500 hover:text-brand-600"
+              >
+                {selectedContacts.length === contacts.length && contacts.length > 0
+                  ? "Deselect All"
+                  : "Select All"}
+              </button>
+            )}
+          </div>
           {contacts.length === 0 ? (
             <p className="text-sm text-zinc-400">No contacts available. Add contacts first.</p>
           ) : (
