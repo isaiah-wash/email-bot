@@ -15,6 +15,7 @@ interface Campaign {
   name: string;
   description: string | null;
   context: string | null;
+  useAi: boolean;
   status: string;
   template: { id: string; name: string } | null;
   contacts: {
@@ -221,6 +222,11 @@ export default function CampaignDetailPage() {
             }`}>
               {campaign.status}
             </span>
+            {!campaign.useAi && (
+              <span className="rounded-full px-2.5 py-0.5 text-xs font-medium bg-amber-50 text-amber-700">
+                No AI
+              </span>
+            )}
           </div>
           {campaign.description && (
             <p className="mt-1 text-sm text-zinc-500">{campaign.description}</p>
