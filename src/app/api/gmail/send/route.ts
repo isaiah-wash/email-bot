@@ -3,6 +3,17 @@ import { prisma } from "@/lib/prisma";
 import { getAuthenticatedUser, unauthorized } from "@/lib/session";
 import { sendEmail } from "@/lib/gmail";
 
+function plainTextToHtml(text: string): string {
+  return text
+    .split(/\n\n+/)
+    .map((paragraph) => `<p>${paragraph.replace(/\n/g, "<br>")}</p>`)
+    .join("");
+}
+
+function isHtml(text: string): boolean {
+  return /<[a-z][\s\S]*>/i.test(text);
+}
+
 function injectTrackingPixel(htmlBody: string, draftId: string, baseUrl: string): string {
   const pixel = `<img src="${baseUrl}/api/track/open?draftId=${draftId}" width="1" height="1" style="display:none;border:0" alt="" />`;
   return htmlBody.includes("</body>")
@@ -48,7 +59,8 @@ export async function POST(req: NextRequest) {
     const baseUrl =
       process.env.NEXTAUTH_URL ??
       (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
-    const bodyWithPixel = injectTrackingPixel(draft.body, draftId, baseUrl);
+    const htmlBody = isHtml(draft.body) ? draft.body : plainTextToHtml(draft.body);
+    const bodyWithPixel = injectTrackingPixel(htmlBody, draftId, baseUrl);
 
     const result = await sendEmail(
       user.id,

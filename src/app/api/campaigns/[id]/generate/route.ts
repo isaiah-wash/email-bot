@@ -109,10 +109,17 @@ export async function POST(
           campaignContext: campaign.context ?? undefined,
         });
       } else {
-        // No AI — use template subject and body instructions directly
+        // No AI — use template subject and body instructions directly.
+        // Convert plain-text newlines to HTML so formatting is preserved
+        // when sent as text/html via Gmail.
+        const rawBody = campaign.template!.bodyInstructions;
+        const htmlBody = rawBody
+          .split(/\n\n+/)
+          .map((paragraph) => `<p>${paragraph.replace(/\n/g, "<br>")}</p>`)
+          .join("");
         generated = {
           subject: campaign.template!.subjectTemplate,
-          body: campaign.template!.bodyInstructions,
+          body: htmlBody,
         };
       }
 
