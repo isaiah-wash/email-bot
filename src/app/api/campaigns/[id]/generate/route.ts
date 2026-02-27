@@ -61,50 +61,60 @@ export async function POST(
 
   const tasks = campaign.contacts.map((cc) => async () => {
     try {
-      // Fetch email history if contact has email
-      let emailHistory: {
-        from: string;
-        subject: string;
-        body: string;
-        date: string;
-      }[] = [];
-      if (cc.contact.email) {
-        try {
-          const threads = await fetchThreadsForContact(
-            user.id,
-            cc.contact.email,
-            3
-          );
-          emailHistory = threads.flatMap((t) =>
-            t.messages.map((m) => ({
-              from: m.from,
-              subject: m.subject,
-              body: m.body,
-              date: m.date,
-            }))
-          );
-        } catch {
-          // Continue without email history
-        }
-      }
+      let generated: { subject: string; body: string };
 
-      const generated = await generateEmailDraft({
-        contactName:
-          [cc.contact.firstName, cc.contact.lastName]
-            .filter(Boolean)
-            .join(" ") ||
-          cc.contact.email ||
-          "Contact",
-        contactEmail: cc.contact.email ?? undefined,
-        contactCompany: cc.contact.company ?? undefined,
-        contactTitle: cc.contact.title ?? undefined,
-        linkedinData:
-          (cc.contact.linkedinData as Record<string, unknown>) ?? undefined,
-        emailHistory,
-        templateSubject: campaign.template!.subjectTemplate,
-        templateInstructions: campaign.template!.bodyInstructions,
-        campaignContext: campaign.context ?? undefined,
-      });
+      if (campaign.useAi) {
+        // AI-powered personalized generation
+        let emailHistory: {
+          from: string;
+          subject: string;
+          body: string;
+          date: string;
+        }[] = [];
+        if (cc.contact.email) {
+          try {
+            const threads = await fetchThreadsForContact(
+              user.id,
+              cc.contact.email,
+              3
+            );
+            emailHistory = threads.flatMap((t) =>
+              t.messages.map((m) => ({
+                from: m.from,
+                subject: m.subject,
+                body: m.body,
+                date: m.date,
+              }))
+            );
+          } catch {
+            // Continue without email history
+          }
+        }
+
+        generated = await generateEmailDraft({
+          contactName:
+            [cc.contact.firstName, cc.contact.lastName]
+              .filter(Boolean)
+              .join(" ") ||
+            cc.contact.email ||
+            "Contact",
+          contactEmail: cc.contact.email ?? undefined,
+          contactCompany: cc.contact.company ?? undefined,
+          contactTitle: cc.contact.title ?? undefined,
+          linkedinData:
+            (cc.contact.linkedinData as Record<string, unknown>) ?? undefined,
+          emailHistory,
+          templateSubject: campaign.template!.subjectTemplate,
+          templateInstructions: campaign.template!.bodyInstructions,
+          campaignContext: campaign.context ?? undefined,
+        });
+      } else {
+        // No AI — use template subject and body instructions directly
+        generated = {
+          subject: campaign.template!.subjectTemplate,
+          body: campaign.template!.bodyInstructions,
+        };
+      }
 
       await prisma.emailDraft.create({
         data: {

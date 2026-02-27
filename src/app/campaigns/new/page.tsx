@@ -32,6 +32,7 @@ export default function NewCampaignPage() {
     description: "",
     context: "",
     templateId: "",
+    useAi: true,
   });
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -169,16 +170,30 @@ export default function NewCampaignPage() {
               placeholder="Cold outreach to potential enterprise clients"
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-zinc-700 mb-1">AI Context / Instructions</label>
-            <textarea
-              value={form.context}
-              onChange={(e) => setForm({ ...form, context: e.target.value })}
-              rows={4}
-              className="w-full rounded-lg border border-brand-100 px-3 py-2 text-sm focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
-              placeholder="We are offering a 20% discount on our Enterprise plan for Q1. Focus on how our product reduces manual work..."
+          <label className="flex items-center justify-between rounded-lg border border-brand-100 px-3 py-3 cursor-pointer">
+            <div>
+              <div className="text-sm font-medium text-zinc-700">Do not use AI</div>
+              <div className="text-xs text-zinc-500">Send template as-is without AI personalization</div>
+            </div>
+            <input
+              type="checkbox"
+              checked={!form.useAi}
+              onChange={() => setForm({ ...form, useAi: !form.useAi })}
+              className="h-4 w-4 rounded border-brand-200 text-brand-500 focus:ring-brand-400"
             />
-          </div>
+          </label>
+          {form.useAi && (
+            <div>
+              <label className="block text-sm font-medium text-zinc-700 mb-1">AI Context / Instructions</label>
+              <textarea
+                value={form.context}
+                onChange={(e) => setForm({ ...form, context: e.target.value })}
+                rows={4}
+                className="w-full rounded-lg border border-brand-100 px-3 py-2 text-sm focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
+                placeholder="We are offering a 20% discount on our Enterprise plan for Q1. Focus on how our product reduces manual work..."
+              />
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium text-zinc-700 mb-1">Template</label>
             <select
