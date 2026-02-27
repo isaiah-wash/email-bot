@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
   if (!user) return unauthorized();
 
   const body = await req.json();
-  const { name, description, context, templateId, contactIds, useAi } = body;
+  const { name, description, context, templateId, contactIds } = body;
 
   if (!name) {
     return NextResponse.json(
@@ -55,7 +55,6 @@ export async function POST(req: NextRequest) {
       description: description || null,
       context: context || null,
       templateId: templateId || null,
-      useAi: useAi !== undefined ? useAi : true,
       contacts: contactIds?.length
         ? {
             create: contactIds.map((contactId: string) => ({
