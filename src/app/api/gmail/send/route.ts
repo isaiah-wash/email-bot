@@ -1,25 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthenticatedUser, unauthorized } from "@/lib/session";
-import { sendEmail } from "@/lib/gmail";
-
-function plainTextToHtml(text: string): string {
-  return text
-    .split(/\n\n+/)
-    .map((paragraph) => `<p>${paragraph.replace(/\n/g, "<br>")}</p>`)
-    .join("");
-}
-
-function isHtml(text: string): boolean {
-  return /<[a-z][\s\S]*>/i.test(text);
-}
-
-function injectTrackingPixel(htmlBody: string, draftId: string, baseUrl: string): string {
-  const pixel = `<img src="${baseUrl}/api/track/open?draftId=${draftId}" width="1" height="1" style="display:none;border:0" alt="" />`;
-  return htmlBody.includes("</body>")
-    ? htmlBody.replace("</body>", `${pixel}</body>`)
-    : htmlBody + pixel;
-}
+import { sendDraft } from "@/lib/gmail";
 
 export async function POST(req: NextRequest) {
   const user = await getAuthenticatedUser();
@@ -59,38 +41,16 @@ export async function POST(req: NextRequest) {
     const baseUrl =
       process.env.NEXTAUTH_URL ??
       (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
-    const htmlBody = isHtml(draft.body) ? draft.body : plainTextToHtml(draft.body);
-    const bodyWithPixel = injectTrackingPixel(htmlBody, draftId, baseUrl);
 
-    const result = await sendEmail(
+    const sentEmail = await sendDraft(
       user.id,
+      draftId,
       draft.contact.email,
       draft.subject,
-      bodyWithPixel
+      draft.body,
+      baseUrl,
+      draft.campaignContactId
     );
-
-    // Update draft status
-    await prisma.emailDraft.update({
-      where: { id: draftId },
-      data: { status: "SENT" },
-    });
-
-    // Create sent email record
-    const sentEmail = await prisma.sentEmail.create({
-      data: {
-        draftId,
-        gmailMessageId: result.messageId,
-        gmailThreadId: result.threadId,
-      },
-    });
-
-    // Update campaign contact status if applicable
-    if (draft.campaignContactId) {
-      await prisma.campaignContact.update({
-        where: { id: draft.campaignContactId },
-        data: { status: "SENT" },
-      });
-    }
 
     return NextResponse.json(sentEmail);
   } catch (error) {
