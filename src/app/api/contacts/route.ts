@@ -9,6 +9,7 @@ export async function GET(req: NextRequest) {
   const search = req.nextUrl.searchParams.get("search") ?? "";
   const enriched = req.nextUrl.searchParams.get("enriched");
   const tagIdParam = req.nextUrl.searchParams.get("tagId");
+  const untagged = req.nextUrl.searchParams.get("untagged");
 
   const where: Record<string, unknown> = { userId: user.id };
 
@@ -27,7 +28,9 @@ export async function GET(req: NextRequest) {
     where.enrichedAt = null;
   }
 
-  if (tagIdParam) {
+  if (untagged === "true") {
+    where.tags = { none: {} };
+  } else if (tagIdParam) {
     const tagIds = tagIdParam.split(",").filter(Boolean);
     if (tagIds.length > 0) {
       where.tags = { some: { tagId: { in: tagIds } } };

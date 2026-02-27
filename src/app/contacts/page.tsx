@@ -141,6 +141,7 @@ export default function ContactsPage() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [allTags, setAllTags] = useState<Tag[]>([]);
   const [activeTags, setActiveTags] = useState<string[]>([]);
+  const [showUntagged, setShowUntagged] = useState(false);
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
@@ -194,11 +195,15 @@ export default function ContactsPage() {
     if (Array.isArray(data)) setAllTags(data);
   }
 
-  async function fetchContacts(q = "", tagIds: string[] = activeTags) {
+  async function fetchContacts(q = "", tagIds: string[] = activeTags, untagged = showUntagged) {
     setLoading(true);
     const params = new URLSearchParams();
     if (q) params.set("search", q);
-    if (tagIds.length > 0) params.set("tagId", tagIds.join(","));
+    if (untagged) {
+      params.set("untagged", "true");
+    } else if (tagIds.length > 0) {
+      params.set("tagId", tagIds.join(","));
+    }
     const res = await fetch(`/api/contacts?${params}`);
     const data = await res.json();
     setContacts(data);
@@ -206,11 +211,12 @@ export default function ContactsPage() {
   }
 
   function toggleTag(tagId: string) {
+    setShowUntagged(false);
     setActiveTags((prev) => {
       const next = prev.includes(tagId)
         ? prev.filter((id) => id !== tagId)
         : [...prev, tagId];
-      fetchContacts(search, next);
+      fetchContacts(search, next, false);
       return next;
     });
   }
@@ -335,7 +341,7 @@ export default function ContactsPage() {
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();
-    fetchContacts(search);
+    fetchContacts(search, activeTags, showUntagged);
   }
 
   async function handleCsvImport(e: React.ChangeEvent<HTMLInputElement>) {
@@ -630,11 +636,27 @@ export default function ContactsPage() {
               </button>
             );
           })}
-          {activeTags.length > 0 && (
+          <button
+            onClick={() => {
+              const next = !showUntagged;
+              setShowUntagged(next);
+              setActiveTags([]);
+              fetchContacts(search, [], next);
+            }}
+            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium border transition-colors ${
+              showUntagged
+                ? "bg-zinc-600 border-zinc-600 text-white"
+                : "border-zinc-300 text-zinc-500 hover:bg-zinc-50"
+            }`}
+          >
+            No Tag
+          </button>
+          {(activeTags.length > 0 || showUntagged) && (
             <button
               onClick={() => {
                 setActiveTags([]);
-                fetchContacts(search, []);
+                setShowUntagged(false);
+                fetchContacts(search, [], false);
               }}
               className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium border border-zinc-200 text-zinc-500 hover:bg-zinc-50"
             >
