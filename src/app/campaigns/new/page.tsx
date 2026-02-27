@@ -170,27 +170,18 @@ export default function NewCampaignPage() {
               placeholder="Cold outreach to potential enterprise clients"
             />
           </div>
-          <div className="flex items-center justify-between rounded-lg border border-brand-100 px-3 py-3">
+          <label className="flex items-center justify-between rounded-lg border border-brand-100 px-3 py-3 cursor-pointer">
             <div>
               <div className="text-sm font-medium text-zinc-700">Do not use AI</div>
               <div className="text-xs text-zinc-500">Send template as-is without AI personalization</div>
             </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={!form.useAi}
-              onClick={() => setForm({ ...form, useAi: !form.useAi })}
-              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
-                !form.useAi ? "bg-brand-500" : "bg-zinc-200"
-              }`}
-            >
-              <span
-                className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-sm ring-0 transition-transform ${
-                  !form.useAi ? "translate-x-5" : "translate-x-0"
-                }`}
-              />
-            </button>
-          </div>
+            <input
+              type="checkbox"
+              checked={!form.useAi}
+              onChange={() => setForm({ ...form, useAi: !form.useAi })}
+              className="h-4 w-4 rounded border-brand-200 text-brand-500 focus:ring-brand-400"
+            />
+          </label>
           {form.useAi && (
             <div>
               <label className="block text-sm font-medium text-zinc-700 mb-1">AI Context / Instructions</label>
