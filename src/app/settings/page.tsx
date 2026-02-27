@@ -241,21 +241,20 @@ export default function SettingsPage() {
                   </div>
                 ) : (
                   <>
-                    <button
-                      onClick={() => startEditTag(tag)}
-                      className="h-4 w-4 rounded-full shrink-0 ring-2 ring-transparent hover:ring-zinc-300 transition-all"
+                    <span
+                      className="h-4 w-4 rounded-full shrink-0"
                       style={{ backgroundColor: tag.color }}
-                      title="Click to change color"
                     />
-                    <button
-                      onClick={() => startEditTag(tag)}
-                      className="flex-1 text-sm text-left hover:text-brand-600"
-                    >
-                      {tag.name}
-                    </button>
+                    <span className="flex-1 text-sm">{tag.name}</span>
                     <span className="text-xs text-zinc-400 shrink-0">
                       {tag._count.contacts} contact{tag._count.contacts !== 1 ? "s" : ""}
                     </span>
+                    <button
+                      onClick={() => startEditTag(tag)}
+                      className="shrink-0 rounded-lg border border-brand-100 px-2 py-1 text-xs font-medium text-zinc-600 hover:bg-brand-50 transition-colors"
+                    >
+                      Edit
+                    </button>
                     <button
                       onClick={() => handleDeleteTag(tag)}
                       disabled={deletingTagId === tag.id}
