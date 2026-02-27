@@ -7,6 +7,7 @@ interface CsvContact {
   lastName: string;
   email: string;
   linkedinUrl: string;
+  autoTag?: string;
 }
 
 interface ValidContact {
@@ -14,6 +15,50 @@ interface ValidContact {
   linkedinUrl: string | null;
   firstName: string | null;
   lastName: string | null;
+  autoTag: string | null;
+}
+
+async function applyAutoTags(userId: string, contacts: ValidContact[]) {
+  const toTag = contacts.filter((c) => c.autoTag);
+  if (toTag.length === 0) return;
+
+  // Group contacts by their autoTag name
+  const byTag: Record<string, ValidContact[]> = {};
+  for (const c of toTag) {
+    const name = c.autoTag!;
+    if (!byTag[name]) byTag[name] = [];
+    byTag[name].push(c);
+  }
+
+  for (const [tagName, taggedContacts] of Object.entries(byTag)) {
+    // Find existing tag or create a new one
+    const tag = await prisma.tag.upsert({
+      where: { userId_name: { userId, name: tagName } },
+      create: { userId, name: tagName, color: "#6366f1" },
+      update: {},
+    });
+
+    const emails = taggedContacts.filter((c) => c.email).map((c) => c.email as string);
+    const linkedinUrls = taggedContacts.filter((c) => c.linkedinUrl).map((c) => c.linkedinUrl as string);
+
+    const orConditions = [
+      ...(emails.length > 0 ? [{ email: { in: emails } }] : []),
+      ...(linkedinUrls.length > 0 ? [{ linkedinUrl: { in: linkedinUrls } }] : []),
+    ];
+    if (orConditions.length === 0) continue;
+
+    const matchedContacts = await prisma.contact.findMany({
+      where: { userId, OR: orConditions },
+      select: { id: true },
+    });
+
+    if (matchedContacts.length > 0) {
+      await prisma.contactTag.createMany({
+        data: matchedContacts.map((c) => ({ contactId: c.id, tagId: tag.id })),
+        skipDuplicates: true,
+      });
+    }
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -69,6 +114,7 @@ export async function POST(req: NextRequest) {
       linkedinUrl,
       firstName: (c.firstName ?? "").trim() || null,
       lastName: (c.lastName ?? "").trim() || null,
+      autoTag: (c.autoTag ?? "").trim() || null,
     });
   }
 
@@ -182,6 +228,8 @@ export async function POST(req: NextRequest) {
     imported = result.count;
     skipped = valid.length - result.count;
   }
+
+  await applyAutoTags(user.id, valid);
 
   return NextResponse.json({ imported, skipped, errors });
 }

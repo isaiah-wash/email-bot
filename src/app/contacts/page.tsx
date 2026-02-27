@@ -50,6 +50,7 @@ interface CsvContactRaw {
   firstName: string | null;
   lastName: string | null;
   linkedinUrl: string | null;
+  autoTag?: string | null;
 }
 
 interface DuplicateEntry {
@@ -59,7 +60,7 @@ interface DuplicateEntry {
 
 interface DuplicatePending {
   duplicates: DuplicateEntry[];
-  allContacts: { email: string; firstName: string; lastName: string; linkedinUrl: string }[];
+  allContacts: { email: string; firstName: string; lastName: string; linkedinUrl: string; autoTag: string }[];
   errors: string[];
 }
 
@@ -128,7 +129,9 @@ function mapCsvRow(row: Record<string, string>) {
     }
   }
 
-  return { email, firstName, lastName, linkedinUrl };
+  const autoTag = row["autotag"] || "";
+
+  return { email, firstName, lastName, linkedinUrl, autoTag };
 }
 
 export default function ContactsPage() {
