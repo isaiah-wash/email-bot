@@ -90,6 +90,7 @@ export async function PATCH(
       ...(body.context !== undefined && { context: body.context }),
       ...(body.templateId !== undefined && { templateId: body.templateId }),
       ...(body.status !== undefined && { status: body.status }),
+      ...(body.useAi !== undefined && { useAi: body.useAi }),
     },
     include: {
       template: true,

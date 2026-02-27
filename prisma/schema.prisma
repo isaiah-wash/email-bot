@@ -90,6 +90,7 @@ model Campaign {
   description String?
   context     String?        @db.Text
   templateId  String?
+  useAi       Boolean        @default(true)
   status      CampaignStatus @default(DRAFT)
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
