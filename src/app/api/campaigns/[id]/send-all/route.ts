@@ -1,7 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthenticatedUser, unauthorized } from "@/lib/session";
-import { sendDraft } from "@/lib/gmail";
+import { sendEmail } from "@/lib/gmail";
+
+function plainTextToHtml(text: string): string {
+  return text
+    .split(/\n\n+/)
+    .map((paragraph) => `<p>${paragraph.replace(/\n/g, "<br>")}</p>`)
+    .join("");
+}
+
+function isHtml(text: string): boolean {
+  return /<[a-z][\s\S]*>/i.test(text);
+}
+
+function injectTrackingPixel(htmlBody: string, draftId: string, baseUrl: string): string {
+  const pixel = `<img src="${baseUrl}/api/track/open?draftId=${draftId}" width="1" height="1" style="display:none;border:0" alt="" />`;
+  return htmlBody.includes("</body>")
+    ? htmlBody.replace("</body>", `${pixel}</body>`)
+    : htmlBody + pixel;
+}
 
 export const maxDuration = 300;
 
@@ -70,15 +88,33 @@ export async function POST(
     }
 
     try {
-      await sendDraft(
+      const htmlBody = isHtml(draft.body) ? draft.body : plainTextToHtml(draft.body);
+      const bodyWithPixel = injectTrackingPixel(htmlBody, draft.id, baseUrl);
+
+      const result = await sendEmail(
         user.id,
-        draft.id,
         cc.contact.email,
         draft.subject,
-        draft.body,
-        baseUrl,
-        cc.id
+        bodyWithPixel
       );
+
+      await prisma.emailDraft.update({
+        where: { id: draft.id },
+        data: { status: "SENT" },
+      });
+
+      await prisma.sentEmail.create({
+        data: {
+          draftId: draft.id,
+          gmailMessageId: result.messageId,
+          gmailThreadId: result.threadId,
+        },
+      });
+
+      await prisma.campaignContact.update({
+        where: { id: cc.id },
+        data: { status: "SENT" },
+      });
 
       return { contactId: cc.contactId, success: true };
     } catch (error) {

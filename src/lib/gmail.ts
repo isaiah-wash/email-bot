@@ -150,66 +150,6 @@ export async function fetchThreadsForContact(
   return threads;
 }
 
-function plainTextToHtml(text: string): string {
-  return text
-    .split(/\n\n+/)
-    .map((paragraph) => `<p>${paragraph.replace(/\n/g, "<br>")}</p>`)
-    .join("");
-}
-
-function isHtml(text: string): boolean {
-  return /<[a-z][\s\S]*>/i.test(text);
-}
-
-function injectTrackingPixel(htmlBody: string, draftId: string, baseUrl: string): string {
-  const pixel = `<img src="${baseUrl}/api/track/open?draftId=${draftId}" width="1" height="1" style="display:none;border:0" alt="" />`;
-  return htmlBody.includes("</body>")
-    ? htmlBody.replace("</body>", `${pixel}</body>`)
-    : htmlBody + pixel;
-}
-
-/** Prepare a draft body for sending: ensure HTML formatting + inject tracking pixel. */
-export function prepareDraftBody(body: string, draftId: string, baseUrl: string): string {
-  const htmlBody = isHtml(body) ? body : plainTextToHtml(body);
-  return injectTrackingPixel(htmlBody, draftId, baseUrl);
-}
-
-/** Send a draft and record the result in the database. Returns the SentEmail record. */
-export async function sendDraft(
-  userId: string,
-  draftId: string,
-  to: string,
-  subject: string,
-  body: string,
-  baseUrl: string,
-  campaignContactId?: string | null
-) {
-  const preparedBody = prepareDraftBody(body, draftId, baseUrl);
-  const result = await sendEmail(userId, to, subject, preparedBody);
-
-  await prisma.emailDraft.update({
-    where: { id: draftId },
-    data: { status: "SENT" },
-  });
-
-  const sentEmail = await prisma.sentEmail.create({
-    data: {
-      draftId,
-      gmailMessageId: result.messageId,
-      gmailThreadId: result.threadId,
-    },
-  });
-
-  if (campaignContactId) {
-    await prisma.campaignContact.update({
-      where: { id: campaignContactId },
-      data: { status: "SENT" },
-    });
-  }
-
-  return sentEmail;
-}
-
 export async function sendEmail(
   userId: string,
   to: string,
