@@ -116,6 +116,8 @@ function mapCsvRow(row: Record<string, string>) {
     row["linkedinurl"] || row["linkedin"] || row["linkedinprofile"] || row["profileurl"] || "";
 
   // Handle "name" or "fullname" columns by splitting
+  const autoTag = row["autotag"] || "";
+
   if (!firstName && !lastName) {
     const fullName = row["name"] || row["fullname"] || row["contactname"] || "";
     if (fullName) {
@@ -125,11 +127,10 @@ function mapCsvRow(row: Record<string, string>) {
         firstName: parts[0] || "",
         lastName: parts.slice(1).join(" ") || "",
         linkedinUrl,
+        autoTag,
       };
     }
   }
-
-  const autoTag = row["autotag"] || "";
 
   return { email, firstName, lastName, linkedinUrl, autoTag };
 }
