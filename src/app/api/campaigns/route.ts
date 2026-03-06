@@ -56,19 +56,23 @@ export async function POST(req: NextRequest) {
       context: context || null,
       templateId: templateId || null,
       useAi: useAi !== undefined ? useAi : true,
-      contacts: contactIds?.length
-        ? {
-            create: contactIds.map((contactId: string) => ({
-              contactId,
-            })),
-          }
-        : undefined,
     },
     include: {
       template: true,
       contacts: { include: { contact: true } },
     },
   });
+
+  if (contactIds?.length) {
+    const uniqueContactIds = [...new Set(contactIds as string[])];
+    await prisma.campaignContact.createMany({
+      data: uniqueContactIds.map((contactId) => ({
+        campaignId: campaign.id,
+        contactId,
+      })),
+      skipDuplicates: true,
+    });
+  }
 
   return NextResponse.json(campaign, { status: 201 });
 }
