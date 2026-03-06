@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
 
     const templateAttachments = draft.campaignContact?.campaign?.template?.attachments;
     const attachments = Array.isArray(templateAttachments)
-      ? (templateAttachments as EmailAttachment[])
+      ? (templateAttachments as unknown as EmailAttachment[])
       : undefined;
 
     const result = await sendEmail(
