@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthenticatedUser, unauthorized } from "@/lib/session";
-import { sendEmail } from "@/lib/gmail";
+import { sendEmail, EmailAttachment } from "@/lib/gmail";
 
 function plainTextToHtml(text: string): string {
   return text
@@ -51,6 +51,17 @@ export async function POST(
 
   const { id: campaignId } = await params;
 
+  // Fetch template attachments for this campaign (if any)
+  const campaign = await prisma.campaign.findFirst({
+    where: { id: campaignId, userId: user.id },
+    include: { template: { select: { attachments: true } } },
+  });
+
+  const attachments =
+    Array.isArray(campaign?.template?.attachments)
+      ? (campaign!.template!.attachments as unknown as EmailAttachment[])
+      : undefined;
+
   // Fetch all DRAFT_READY contacts with their latest draft
   const campaignContacts = await prisma.campaignContact.findMany({
     where: {
@@ -95,7 +106,9 @@ export async function POST(
         user.id,
         cc.contact.email,
         draft.subject,
-        bodyWithPixel
+        bodyWithPixel,
+        undefined,
+        attachments
       );
 
       await prisma.emailDraft.update({
