@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
   if (!user) return unauthorized();
 
   const body = await req.json();
-  const { name, subjectTemplate, bodyInstructions, variables } = body;
+  const { name, subjectTemplate, bodyInstructions, variables, attachments } = body;
 
   if (!name || !subjectTemplate || !bodyInstructions) {
     return NextResponse.json(
@@ -38,6 +38,7 @@ export async function POST(req: NextRequest) {
       subjectTemplate,
       bodyInstructions,
       variables: variables || null,
+      attachments: attachments || null,
     },
   });
 

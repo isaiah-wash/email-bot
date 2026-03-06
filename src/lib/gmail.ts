@@ -150,12 +150,19 @@ export async function fetchThreadsForContact(
   return threads;
 }
 
+export interface EmailAttachment {
+  name: string;
+  mimeType: string;
+  data: string; // base64-encoded file content
+}
+
 export async function sendEmail(
   userId: string,
   to: string,
   subject: string,
   body: string,
-  threadId?: string
+  threadId?: string,
+  attachments?: EmailAttachment[]
 ): Promise<{ messageId: string; threadId: string }> {
   const gmail = await getGmailClient(userId);
 
@@ -163,19 +170,54 @@ export async function sendEmail(
   const profile = await gmail.users.getProfile({ userId: "me" });
   const fromEmail = profile.data.emailAddress;
 
-  const headers = [
+  const baseHeaders = [
     `From: ${fromEmail}`,
     `To: ${to}`,
     `Subject: ${subject}`,
-    `Content-Type: text/html; charset=utf-8`,
+    `MIME-Version: 1.0`,
   ];
 
   if (threadId) {
-    headers.push(`In-Reply-To: ${threadId}`);
-    headers.push(`References: ${threadId}`);
+    baseHeaders.push(`In-Reply-To: ${threadId}`);
+    baseHeaders.push(`References: ${threadId}`);
   }
 
-  const message = headers.join("\r\n") + "\r\n\r\n" + body;
+  let message: string;
+
+  if (attachments && attachments.length > 0) {
+    const boundary = `----=_Part_${Date.now().toString(36)}`;
+    baseHeaders.push(`Content-Type: multipart/mixed; boundary="${boundary}"`);
+
+    const parts: string[] = [];
+
+    // HTML body part
+    parts.push(
+      `--${boundary}\r\n` +
+      `Content-Type: text/html; charset=utf-8\r\n` +
+      `Content-Transfer-Encoding: quoted-printable\r\n\r\n` +
+      body
+    );
+
+    // Attachment parts
+    for (const attachment of attachments) {
+      parts.push(
+        `--${boundary}\r\n` +
+        `Content-Type: ${attachment.mimeType}; name="${attachment.name}"\r\n` +
+        `Content-Transfer-Encoding: base64\r\n` +
+        `Content-Disposition: attachment; filename="${attachment.name}"\r\n\r\n` +
+        attachment.data
+      );
+    }
+
+    message =
+      baseHeaders.join("\r\n") +
+      "\r\n\r\n" +
+      parts.join("\r\n") +
+      `\r\n--${boundary}--`;
+  } else {
+    baseHeaders.push(`Content-Type: text/html; charset=utf-8`);
+    message = baseHeaders.join("\r\n") + "\r\n\r\n" + body;
+  }
 
   const encodedMessage = Buffer.from(message)
     .toString("base64")

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthenticatedUser, unauthorized } from "@/lib/session";
-import { sendEmail } from "@/lib/gmail";
+import { sendEmail, EmailAttachment } from "@/lib/gmail";
 
 function plainTextToHtml(text: string): string {
   return text
@@ -37,7 +37,16 @@ export async function POST(req: NextRequest) {
 
   const draft = await prisma.emailDraft.findFirst({
     where: { id: draftId },
-    include: { contact: true },
+    include: {
+      contact: true,
+      campaignContact: {
+        include: {
+          campaign: {
+            include: { template: true },
+          },
+        },
+      },
+    },
   });
 
   if (!draft) {
@@ -62,11 +71,18 @@ export async function POST(req: NextRequest) {
     const htmlBody = isHtml(draft.body) ? draft.body : plainTextToHtml(draft.body);
     const bodyWithPixel = injectTrackingPixel(htmlBody, draftId, baseUrl);
 
+    const templateAttachments = draft.campaignContact?.campaign?.template?.attachments;
+    const attachments = Array.isArray(templateAttachments)
+      ? (templateAttachments as EmailAttachment[])
+      : undefined;
+
     const result = await sendEmail(
       user.id,
       draft.contact.email,
       draft.subject,
-      bodyWithPixel
+      bodyWithPixel,
+      undefined,
+      attachments
     );
 
     // Update draft status

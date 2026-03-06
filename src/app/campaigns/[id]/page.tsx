@@ -2,12 +2,20 @@
 
 import { useSession } from "next-auth/react";
 import { useRouter, useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
 interface TemplateOption {
   id: string;
   name: string;
+}
+
+interface ContactOption {
+  id: string;
+  email: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  company: string | null;
 }
 
 interface Campaign {
@@ -103,6 +111,13 @@ export default function CampaignDetailPage() {
   const [templates, setTemplates] = useState<TemplateOption[]>([]);
   const [updatingTemplate, setUpdatingTemplate] = useState(false);
 
+  const [editingContacts, setEditingContacts] = useState(false);
+  const [allContacts, setAllContacts] = useState<ContactOption[]>([]);
+  const [contactSearch, setContactSearch] = useState("");
+  const [selectedContactIds, setSelectedContactIds] = useState<Set<string>>(new Set());
+  const [savingContacts, setSavingContacts] = useState(false);
+  const contactSearchRef = useRef<HTMLInputElement>(null);
+
   const [activeTab, setActiveTab] = useState<"contacts" | "analytics">("contacts");
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
@@ -185,6 +200,37 @@ export default function CampaignDetailPage() {
     } finally {
       setAnalyticsLoading(false);
     }
+  }
+
+  async function openEditContacts() {
+    const res = await fetch("/api/contacts");
+    if (res.ok) {
+      const contacts = await res.json();
+      setAllContacts(contacts);
+    }
+    const currentIds = new Set(campaign!.contacts.map((cc) => cc.contact.id));
+    setSelectedContactIds(currentIds);
+    setContactSearch("");
+    setEditingContacts(true);
+    setTimeout(() => contactSearchRef.current?.focus(), 50);
+  }
+
+  async function saveContactEdits() {
+    if (!campaign) return;
+    setSavingContacts(true);
+    const currentIds = new Set(campaign.contacts.map((cc) => cc.contact.id));
+    const addContactIds = [...selectedContactIds].filter((id) => !currentIds.has(id));
+    const removeContactIds = [...currentIds].filter((id) => !selectedContactIds.has(id));
+
+    await fetch(`/api/campaigns/${campaignId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ addContactIds, removeContactIds }),
+    });
+
+    await fetchCampaign();
+    setSavingContacts(false);
+    setEditingContacts(false);
   }
 
   if (status === "loading" || loading || !session) {
@@ -345,48 +391,136 @@ export default function CampaignDetailPage() {
 
           {/* Contacts table */}
           <div className="rounded-xl border border-brand-100 bg-white">
-            <div className="border-b border-brand-50 px-5 py-4">
+            <div className="border-b border-brand-50 px-5 py-4 flex items-center justify-between">
               <h2 className="text-sm font-semibold">
                 Contacts ({campaign.contacts.length})
               </h2>
+              {!editingContacts && (
+                <button
+                  onClick={openEditContacts}
+                  className="text-xs text-brand-500 hover:text-brand-700 font-medium"
+                >
+                  Edit contacts
+                </button>
+              )}
             </div>
-            <div className="divide-y divide-brand-50">
-              {campaign.contacts.map((cc) => {
-                const name = [cc.contact.firstName, cc.contact.lastName].filter(Boolean).join(" ") || "Unnamed";
-                const latestDraft = cc.drafts[0];
 
-                return (
-                  <div key={cc.id} className="flex items-center justify-between px-5 py-4">
-                    <div className="min-w-0">
-                      <Link href={`/contacts/${cc.contact.id}`} className="text-sm font-medium hover:underline">
-                        {name}
-                      </Link>
-                      <div className="text-xs text-zinc-500 mt-0.5">
-                        {cc.contact.email || "No email"} {cc.contact.company && `· ${cc.contact.company}`}
+            {editingContacts ? (
+              <div className="p-5 space-y-3">
+                <input
+                  ref={contactSearchRef}
+                  type="text"
+                  placeholder="Search contacts..."
+                  value={contactSearch}
+                  onChange={(e) => setContactSearch(e.target.value)}
+                  className="w-full rounded-lg border border-brand-100 px-3 py-2 text-sm focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
+                />
+                <div className="max-h-72 overflow-y-auto divide-y divide-brand-50 rounded-lg border border-brand-100">
+                  {allContacts
+                    .filter((c) => {
+                      const q = contactSearch.toLowerCase();
+                      return (
+                        !q ||
+                        (c.firstName ?? "").toLowerCase().includes(q) ||
+                        (c.lastName ?? "").toLowerCase().includes(q) ||
+                        (c.email ?? "").toLowerCase().includes(q) ||
+                        (c.company ?? "").toLowerCase().includes(q)
+                      );
+                    })
+                    .map((c) => {
+                      const name = [c.firstName, c.lastName].filter(Boolean).join(" ") || "Unnamed";
+                      const checked = selectedContactIds.has(c.id);
+                      return (
+                        <label key={c.id} className="flex items-center gap-3 px-3 py-2.5 hover:bg-brand-50/50 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => {
+                              setSelectedContactIds((prev) => {
+                                const next = new Set(prev);
+                                if (next.has(c.id)) next.delete(c.id);
+                                else next.add(c.id);
+                                return next;
+                              });
+                            }}
+                            className="rounded border-brand-200 text-brand-500 focus:ring-brand-400"
+                          />
+                          <div className="min-w-0">
+                            <div className="text-sm font-medium truncate">{name}</div>
+                            <div className="text-xs text-zinc-400 truncate">
+                              {c.email || "No email"}{c.company && ` · ${c.company}`}
+                            </div>
+                          </div>
+                        </label>
+                      );
+                    })}
+                </div>
+                <div className="flex items-center justify-between pt-1">
+                  <span className="text-xs text-zinc-400">{selectedContactIds.size} selected</span>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setEditingContacts(false)}
+                      className="rounded-lg border border-brand-100 px-3 py-1.5 text-sm text-zinc-600 hover:bg-zinc-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={saveContactEdits}
+                      disabled={savingContacts}
+                      className="rounded-lg bg-brand-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50"
+                    >
+                      {savingContacts ? "Saving..." : "Save"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="divide-y divide-brand-50">
+                {campaign.contacts.length === 0 && (
+                  <p className="px-5 py-8 text-center text-sm text-zinc-400">
+                    No contacts yet.{" "}
+                    <button onClick={openEditContacts} className="text-brand-500 hover:underline">
+                      Add contacts
+                    </button>
+                  </p>
+                )}
+                {campaign.contacts.map((cc) => {
+                  const name = [cc.contact.firstName, cc.contact.lastName].filter(Boolean).join(" ") || "Unnamed";
+                  const latestDraft = cc.drafts[0];
+
+                  return (
+                    <div key={cc.id} className="flex items-center justify-between px-5 py-4">
+                      <div className="min-w-0">
+                        <Link href={`/contacts/${cc.contact.id}`} className="text-sm font-medium hover:underline">
+                          {name}
+                        </Link>
+                        <div className="text-xs text-zinc-500 mt-0.5">
+                          {cc.contact.email || "No email"} {cc.contact.company && `· ${cc.contact.company}`}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0 ml-4">
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                          cc.status === "SENT" ? "bg-emerald-50 text-emerald-700" :
+                          cc.status === "APPROVED" ? "bg-brand-50 text-brand-600" :
+                          cc.status === "DRAFT_READY" ? "bg-amber-50 text-amber-700" :
+                          "bg-zinc-100 text-zinc-600"
+                        }`}>
+                          {cc.status.replace("_", " ")}
+                        </span>
+                        {latestDraft && (
+                          <Link
+                            href={`/compose/${latestDraft.id}`}
+                            className="text-xs text-brand-500 hover:underline"
+                          >
+                            {latestDraft.status === "SENT" ? "View" : "Review"}
+                          </Link>
+                        )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-3 shrink-0 ml-4">
-                      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                        cc.status === "SENT" ? "bg-emerald-50 text-emerald-700" :
-                        cc.status === "APPROVED" ? "bg-brand-50 text-brand-600" :
-                        cc.status === "DRAFT_READY" ? "bg-amber-50 text-amber-700" :
-                        "bg-zinc-100 text-zinc-600"
-                      }`}>
-                        {cc.status.replace("_", " ")}
-                      </span>
-                      {latestDraft && (
-                        <Link
-                          href={`/compose/${latestDraft.id}`}
-                          className="text-xs text-brand-500 hover:underline"
-                        >
-                          {latestDraft.status === "SENT" ? "View" : "Review"}
-                        </Link>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </>
       )}

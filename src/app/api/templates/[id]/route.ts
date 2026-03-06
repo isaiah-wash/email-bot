@@ -58,6 +58,7 @@ export async function PATCH(
         bodyInstructions: body.bodyInstructions,
       }),
       ...(body.variables !== undefined && { variables: body.variables }),
+      ...(body.attachments !== undefined && { attachments: body.attachments }),
     },
   });
 

@@ -2,13 +2,20 @@
 
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+
+interface Attachment {
+  name: string;
+  mimeType: string;
+  data: string; // base64
+}
 
 interface Template {
   id: string;
   name: string;
   subjectTemplate: string;
   bodyInstructions: string;
+  attachments: Attachment[] | null;
   _count: { campaigns: number };
   createdAt: string;
 }
@@ -31,6 +38,8 @@ export default function TemplatesPage() {
     subjectTemplate: "",
     bodyInstructions: "",
   });
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [saving, setSaving] = useState(false);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [selectedCampaignIds, setSelectedCampaignIds] = useState<string[]>([]);
@@ -61,11 +70,12 @@ export default function TemplatesPage() {
     const res = await fetch(url, {
       method,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...form, campaignIds: selectedCampaignIds }),
+      body: JSON.stringify({ ...form, attachments, campaignIds: selectedCampaignIds }),
     });
 
     if (res.ok) {
       setForm({ name: "", subjectTemplate: "", bodyInstructions: "" });
+      setAttachments([]);
       setSelectedCampaignIds([]);
       setShowForm(false);
       setEditingId(null);
@@ -75,12 +85,36 @@ export default function TemplatesPage() {
     setSaving(false);
   }
 
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    files.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = reader.result as string;
+        // dataUrl is "data:<mimeType>;base64,<data>" — extract just the base64 part
+        const base64 = dataUrl.split(",")[1];
+        setAttachments((prev) => [
+          ...prev,
+          { name: file.name, mimeType: file.type || "application/octet-stream", data: base64 },
+        ]);
+      };
+      reader.readAsDataURL(file);
+    });
+    // Reset input so the same file can be re-added if removed
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  function removeAttachment(index: number) {
+    setAttachments((prev) => prev.filter((_, i) => i !== index));
+  }
+
   async function startEdit(template: Template) {
     setForm({
       name: template.name,
       subjectTemplate: template.subjectTemplate,
       bodyInstructions: template.bodyInstructions,
     });
+    setAttachments(template.attachments ?? []);
     setEditingId(template.id);
     setShowForm(true);
     // Fetch current campaign assignments for this template
@@ -117,6 +151,7 @@ export default function TemplatesPage() {
             setShowForm(!showForm);
             setEditingId(null);
             setForm({ name: "", subjectTemplate: "", bodyInstructions: "" });
+            setAttachments([]);
             setSelectedCampaignIds([]);
           }}
           className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 transition-colors"
@@ -161,6 +196,42 @@ export default function TemplatesPage() {
               placeholder="Write a friendly cold outreach email. Reference the contact's current role and company. Mention how our product helps with [specific value prop]. Keep it under 150 words. End with a soft CTA asking for a 15-minute call."
             />
             <p className="mt-1 text-xs text-zinc-400">Instructions for Claude to generate the email body</p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-zinc-700 mb-2">
+              Attachments ({attachments.length})
+            </label>
+            {attachments.length > 0 && (
+              <ul className="mb-2 space-y-1">
+                {attachments.map((a, i) => (
+                  <li key={i} className="flex items-center justify-between rounded-lg border border-brand-100 bg-brand-50/50 px-3 py-2 text-sm">
+                    <span className="truncate text-zinc-700">{a.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeAttachment(i)}
+                      className="ml-2 text-red-400 hover:text-red-600 shrink-0"
+                    >
+                      Remove
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              onChange={handleFileChange}
+              className="hidden"
+              id="attachment-input"
+            />
+            <label
+              htmlFor="attachment-input"
+              className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-brand-200 px-3 py-1.5 text-sm text-brand-600 hover:bg-brand-50 transition-colors"
+            >
+              + Add attachment
+            </label>
+            <p className="mt-1 text-xs text-zinc-400">Files are stored with the template and attached to every email sent from it</p>
           </div>
           <div>
             <label className="block text-sm font-medium text-zinc-700 mb-2">
@@ -223,6 +294,11 @@ export default function TemplatesPage() {
                   <p className="text-xs text-zinc-500 mt-0.5">Subject: {template.subjectTemplate}</p>
                 </div>
                 <div className="flex items-center gap-2">
+                  {template.attachments && template.attachments.length > 0 && (
+                    <span className="text-xs text-zinc-400">
+                      {template.attachments.length} attachment{template.attachments.length !== 1 ? "s" : ""}
+                    </span>
+                  )}
                   <span className="text-xs text-zinc-400">{template._count.campaigns} campaigns</span>
                   <button
                     onClick={() => startEdit(template)}
