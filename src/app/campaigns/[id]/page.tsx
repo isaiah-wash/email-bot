@@ -433,7 +433,7 @@ export default function CampaignDetailPage() {
                   onChange={(e) => setContactSearch(e.target.value)}
                   className="w-full rounded-lg border border-brand-100 px-3 py-2 text-sm focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
                 />
-                <div className="max-h-72 overflow-y-auto divide-y divide-brand-50 rounded-lg border border-brand-100">
+                <div className="max-h-[32rem] overflow-y-auto divide-y divide-brand-50 rounded-lg border border-brand-100">
                   {allContacts
                     .filter((c) => {
                       const q = contactSearch.toLowerCase();
