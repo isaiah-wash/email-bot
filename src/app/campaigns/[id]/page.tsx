@@ -106,6 +106,7 @@ export default function CampaignDetailPage() {
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState<string | null>(null);
   const [sendingAll, setSendingAll] = useState(false);
   const [sendAllResult, setSendAllResult] = useState<{ sent: number; failed: number } | null>(null);
   const [templates, setTemplates] = useState<TemplateOption[]>([]);
@@ -145,11 +146,19 @@ export default function CampaignDetailPage() {
 
   async function handleGenerate() {
     setGenerating(true);
+    setGenerateError(null);
     const res = await fetch(`/api/campaigns/${campaignId}/generate`, {
       method: "POST",
     });
     if (res.ok) {
+      const data = await res.json();
+      if (data.failed > 0 && data.generated === 0) {
+        setGenerateError(`Generation failed for all ${data.failed} contact(s): ${data.results[0]?.error ?? "unknown error"}`);
+      }
       fetchCampaign();
+    } else {
+      const data = await res.json().catch(() => ({}));
+      setGenerateError(data.error ?? `Request failed with status ${res.status}`);
     }
     setGenerating(false);
   }
@@ -305,6 +314,15 @@ export default function CampaignDetailPage() {
           </button>
         </div>
       </div>
+
+      {generateError && (
+        <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 flex items-center justify-between">
+          <p className="text-sm text-red-800">{generateError}</p>
+          <button onClick={() => setGenerateError(null)} className="text-red-600 hover:text-red-800 text-sm ml-4 shrink-0">
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {sendAllResult && (
         <div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 p-4 flex items-center justify-between">
