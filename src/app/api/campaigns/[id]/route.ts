@@ -14,7 +14,9 @@ export async function GET(
   const campaign = await prisma.campaign.findFirst({
     where: { id, userId: user.id },
     include: {
-      template: true,
+      template: {
+        select: { id: true, name: true },
+      },
       contacts: {
         include: {
           contact: true,
@@ -93,7 +95,7 @@ export async function PATCH(
       ...(body.useAi !== undefined && { useAi: body.useAi }),
     },
     include: {
-      template: true,
+      template: { select: { id: true, name: true } },
       contacts: { include: { contact: true } },
     },
   });

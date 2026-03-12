@@ -9,8 +9,16 @@ export async function GET() {
   const templates = await prisma.template.findMany({
     where: { userId: user.id },
     orderBy: { createdAt: "desc" },
-    include: {
+    select: {
+      id: true,
+      name: true,
+      subjectTemplate: true,
+      bodyInstructions: true,
+      variables: true,
+      createdAt: true,
+      updatedAt: true,
       _count: { select: { campaigns: true } },
+      // attachments intentionally excluded — can be large base64 data
     },
   });
 

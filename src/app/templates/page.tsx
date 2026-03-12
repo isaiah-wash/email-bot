@@ -15,7 +15,6 @@ interface Template {
   name: string;
   subjectTemplate: string;
   bodyInstructions: string;
-  attachments: Attachment[] | null;
   _count: { campaigns: number };
   createdAt: string;
 }
@@ -114,13 +113,14 @@ export default function TemplatesPage() {
       subjectTemplate: template.subjectTemplate,
       bodyInstructions: template.bodyInstructions,
     });
-    setAttachments(template.attachments ?? []);
+    setAttachments([]);
     setEditingId(template.id);
     setShowForm(true);
-    // Fetch current campaign assignments for this template
+    // Fetch full template data (includes attachments and campaign assignments)
     const res = await fetch(`/api/templates/${template.id}`);
     if (res.ok) {
       const data = await res.json();
+      setAttachments(data.attachments ?? []);
       setSelectedCampaignIds(data.campaigns?.map((c: { id: string }) => c.id) || []);
     }
   }
@@ -294,11 +294,6 @@ export default function TemplatesPage() {
                   <p className="text-xs text-zinc-500 mt-0.5">Subject: {template.subjectTemplate}</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  {template.attachments && template.attachments.length > 0 && (
-                    <span className="text-xs text-zinc-400">
-                      {template.attachments.length} attachment{template.attachments.length !== 1 ? "s" : ""}
-                    </span>
-                  )}
                   <span className="text-xs text-zinc-400">{template._count.campaigns} campaigns</span>
                   <button
                     onClick={() => startEdit(template)}

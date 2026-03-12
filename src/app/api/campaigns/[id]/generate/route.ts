@@ -37,7 +37,12 @@ export async function POST(
   const campaign = await prisma.campaign.findFirst({
     where: { id, userId: user.id },
     include: {
-      template: true,
+      template: {
+        select: {
+          subjectTemplate: true,
+          bodyInstructions: true,
+        },
+      },
       contacts: {
         where: { status: "PENDING" },
         include: { contact: true },
