@@ -64,6 +64,16 @@ interface DuplicatePending {
   errors: string[];
 }
 
+interface PendingImport {
+  csvContacts: { email: string; firstName: string; lastName: string; linkedinUrl: string; autoTag: string }[];
+}
+
+function suggestTagName(fileName: string): string {
+  const base = fileName.replace(/\.[^/.]+$/, "");
+  const words = base.replace(/[-_]+/g, " ").trim().split(/\s+/);
+  return words.map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+}
+
 function parseCsv(text: string): Record<string, string>[] {
   const lines = text.split(/\r?\n/).filter((l) => l.trim());
   if (lines.length < 2) return [];
@@ -175,9 +185,16 @@ export default function ContactsPage() {
     imported: number;
     skipped: number;
     errors: string[];
+    tag?: Tag | null;
   } | null>(null);
   const [duplicatePending, setDuplicatePending] = useState<DuplicatePending | null>(null);
   const [resolutions, setResolutions] = useState<Record<string, "update" | "create">>({});
+
+  // Naming the batch tag for the current import, shown before upload starts
+  const [pendingImport, setPendingImport] = useState<PendingImport | null>(null);
+  const [importTagName, setImportTagName] = useState("");
+  const [importTagColor, setImportTagColor] = useState(TAG_COLORS[0].value);
+  const [skipImportTag, setSkipImportTag] = useState(false);
 
   useEffect(() => {
     if (status === "unauthenticated") router.replace("/");
@@ -348,8 +365,6 @@ export default function ContactsPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setImporting(true);
-    setImportResult(null);
     setError("");
 
     try {
@@ -358,16 +373,40 @@ export default function ContactsPage() {
 
       if (rows.length === 0) {
         setError("CSV file is empty or has no data rows");
-        setImporting(false);
+        if (fileInputRef.current) fileInputRef.current.value = "";
         return;
       }
 
       const csvContacts = rows.map(mapCsvRow);
+      setImportTagName(suggestTagName(file.name));
+      setImportTagColor(TAG_COLORS[0].value);
+      setSkipImportTag(false);
+      setPendingImport({ csvContacts });
+    } catch {
+      setError("Failed to read or parse CSV file");
+    }
 
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  function currentImportTag(): { name: string; color?: string } | undefined {
+    if (skipImportTag || !importTagName.trim()) return undefined;
+    return { name: importTagName.trim(), color: importTagColor };
+  }
+
+  async function submitPendingImport() {
+    if (!pendingImport) return;
+    setImporting(true);
+    setError("");
+
+    try {
       const res = await fetch("/api/contacts/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contacts: csvContacts }),
+        body: JSON.stringify({
+          contacts: pendingImport.csvContacts,
+          importTag: currentImportTag(),
+        }),
       });
 
       const data = await res.json();
@@ -382,22 +421,26 @@ export default function ContactsPage() {
           setResolutions(defaultResolutions);
           setDuplicatePending({
             duplicates: data.duplicates,
-            allContacts: csvContacts,
+            allContacts: pendingImport.csvContacts,
             errors: data.errors,
           });
+          setPendingImport(null);
         } else {
           setImportResult(data);
+          setPendingImport(null);
           fetchContacts(search);
+          fetchTags();
         }
       } else {
         setError(data.error || "Import failed");
+        setPendingImport(null);
       }
     } catch {
       setError("Failed to read or parse CSV file");
+      setPendingImport(null);
     }
 
     setImporting(false);
-    if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
   async function handleDuplicateResolution() {
@@ -407,7 +450,11 @@ export default function ContactsPage() {
       const res = await fetch("/api/contacts/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contacts: duplicatePending.allContacts, resolutions }),
+        body: JSON.stringify({
+          contacts: duplicatePending.allContacts,
+          resolutions,
+          importTag: currentImportTag(),
+        }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -415,6 +462,7 @@ export default function ContactsPage() {
         setDuplicatePending(null);
         setResolutions({});
         fetchContacts(search);
+        fetchTags();
       } else {
         setError(data.error || "Import failed");
         setDuplicatePending(null);
@@ -517,6 +565,17 @@ export default function ContactsPage() {
                   ({importResult.skipped} skipped as duplicates)
                 </span>
               )}
+              {importResult.tag && (
+                <span className="ml-2">
+                  and tagged as{" "}
+                  <span
+                    className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium text-white align-middle"
+                    style={{ backgroundColor: importResult.tag.color }}
+                  >
+                    {importResult.tag.name}
+                  </span>
+                </span>
+              )}
             </div>
             <button
               onClick={() => setImportResult(null)}
@@ -547,6 +606,71 @@ export default function ContactsPage() {
           >
             Dismiss
           </button>
+        </div>
+      )}
+
+      {/* Name-this-import modal — shown right after a CSV is picked, before any upload happens */}
+      {pendingImport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white shadow-xl p-6">
+            <h2 className="text-lg font-semibold">Tag This List</h2>
+            <p className="mt-1 text-sm text-zinc-500">
+              {pendingImport.csvContacts.length} contact{pendingImport.csvContacts.length !== 1 ? "s" : ""} in this
+              CSV. Give them a tag so you can target this exact list in a campaign later.
+            </p>
+
+            <div className="mt-4">
+              <label className="block text-xs font-medium text-zinc-500 mb-1">Tag name</label>
+              <input
+                autoFocus
+                type="text"
+                value={importTagName}
+                onChange={(e) => setImportTagName(e.target.value)}
+                disabled={skipImportTag}
+                placeholder="e.g. Q3 Outreach"
+                className="w-full rounded-lg border border-brand-100 px-3 py-2 text-sm focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400 disabled:opacity-50 disabled:bg-zinc-50"
+              />
+              <div className="mt-2 flex gap-1.5 flex-wrap">
+                {TAG_COLORS.map((c) => (
+                  <button
+                    key={c.value}
+                    onClick={() => setImportTagColor(c.value)}
+                    disabled={skipImportTag}
+                    className="h-5 w-5 rounded-full border-2 transition-transform hover:scale-110 disabled:opacity-40"
+                    style={{
+                      backgroundColor: c.value,
+                      borderColor: importTagColor === c.value ? "#1e293b" : "transparent",
+                    }}
+                    title={c.label}
+                  />
+                ))}
+              </div>
+              <label className="mt-3 flex items-center gap-2 text-xs text-zinc-500">
+                <input
+                  type="checkbox"
+                  checked={skipImportTag}
+                  onChange={(e) => setSkipImportTag(e.target.checked)}
+                />
+                Import without tagging
+              </label>
+            </div>
+
+            <div className="mt-6 flex items-center justify-end gap-2">
+              <button
+                onClick={() => setPendingImport(null)}
+                className="rounded-lg border border-brand-100 px-4 py-2 text-sm text-zinc-700 hover:bg-brand-50/50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitPendingImport}
+                disabled={importing || (!skipImportTag && !importTagName.trim())}
+                className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 transition-colors disabled:opacity-50"
+              >
+                {importing ? "Importing..." : "Import CSV"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -677,6 +801,11 @@ export default function ContactsPage() {
                 {duplicatePending.duplicates.length !== 1 ? "s" : ""} in your CSV already
                 exist in your contacts. Choose how to handle each one.
               </p>
+              {!skipImportTag && importTagName.trim() && (
+                <p className="mt-2 text-xs text-brand-600">
+                  All contacts from this import will still be tagged as &ldquo;{importTagName.trim()}&rdquo;.
+                </p>
+              )}
             </div>
 
             <div className="px-6 pb-2 flex gap-3">

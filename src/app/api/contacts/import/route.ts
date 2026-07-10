@@ -18,6 +18,45 @@ interface ValidContact {
   autoTag: string | null;
 }
 
+// Tags all contacts matching the given emails/linkedinUrls with a single tag,
+// upserting the tag by name first. Used for both per-row autoTag columns and
+// the batch-level "tag this whole import" option.
+async function tagMatchingContacts(
+  userId: string,
+  tagName: string,
+  tagColor: string | undefined,
+  taggedContacts: ValidContact[]
+) {
+  const tag = await prisma.tag.upsert({
+    where: { userId_name: { userId, name: tagName } },
+    create: { userId, name: tagName, color: tagColor || "#6366f1" },
+    update: {},
+  });
+
+  const emails = taggedContacts.filter((c) => c.email).map((c) => c.email as string);
+  const linkedinUrls = taggedContacts.filter((c) => c.linkedinUrl).map((c) => c.linkedinUrl as string);
+
+  const orConditions = [
+    ...(emails.length > 0 ? [{ email: { in: emails } }] : []),
+    ...(linkedinUrls.length > 0 ? [{ linkedinUrl: { in: linkedinUrls } }] : []),
+  ];
+  if (orConditions.length === 0) return tag;
+
+  const matchedContacts = await prisma.contact.findMany({
+    where: { userId, OR: orConditions },
+    select: { id: true },
+  });
+
+  if (matchedContacts.length > 0) {
+    await prisma.contactTag.createMany({
+      data: matchedContacts.map((c) => ({ contactId: c.id, tagId: tag.id })),
+      skipDuplicates: true,
+    });
+  }
+
+  return tag;
+}
+
 async function applyAutoTags(userId: string, contacts: ValidContact[]) {
   const toTag = contacts.filter((c) => c.autoTag);
   if (toTag.length === 0) return;
@@ -31,33 +70,7 @@ async function applyAutoTags(userId: string, contacts: ValidContact[]) {
   }
 
   for (const [tagName, taggedContacts] of Object.entries(byTag)) {
-    // Find existing tag or create a new one
-    const tag = await prisma.tag.upsert({
-      where: { userId_name: { userId, name: tagName } },
-      create: { userId, name: tagName, color: "#6366f1" },
-      update: {},
-    });
-
-    const emails = taggedContacts.filter((c) => c.email).map((c) => c.email as string);
-    const linkedinUrls = taggedContacts.filter((c) => c.linkedinUrl).map((c) => c.linkedinUrl as string);
-
-    const orConditions = [
-      ...(emails.length > 0 ? [{ email: { in: emails } }] : []),
-      ...(linkedinUrls.length > 0 ? [{ linkedinUrl: { in: linkedinUrls } }] : []),
-    ];
-    if (orConditions.length === 0) continue;
-
-    const matchedContacts = await prisma.contact.findMany({
-      where: { userId, OR: orConditions },
-      select: { id: true },
-    });
-
-    if (matchedContacts.length > 0) {
-      await prisma.contactTag.createMany({
-        data: matchedContacts.map((c) => ({ contactId: c.id, tagId: tag.id })),
-        skipDuplicates: true,
-      });
-    }
+    await tagMatchingContacts(userId, tagName, undefined, taggedContacts);
   }
 }
 
@@ -65,14 +78,19 @@ export async function POST(req: NextRequest) {
   const user = await getAuthenticatedUser();
   if (!user) return unauthorized();
 
-  let body: { contacts: CsvContact[]; resolutions?: Record<string, "update" | "create"> };
+  let body: {
+    contacts: CsvContact[];
+    resolutions?: Record<string, "update" | "create">;
+    importTag?: { name: string; color?: string };
+  };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { contacts, resolutions } = body;
+  const { contacts, resolutions, importTag } = body;
+  const importTagName = importTag?.name?.trim() || null;
 
   if (!Array.isArray(contacts) || contacts.length === 0) {
     return NextResponse.json({ error: "No contacts provided" }, { status: 400 });
@@ -231,5 +249,11 @@ export async function POST(req: NextRequest) {
 
   await applyAutoTags(user.id, valid);
 
-  return NextResponse.json({ imported, skipped, errors });
+  // Tag every contact in this import (new, updated, or duplicate-created) with
+  // a single batch tag so the whole list can be targeted as one campaign audience.
+  const tag = importTagName
+    ? await tagMatchingContacts(user.id, importTagName, importTag?.color, valid)
+    : null;
+
+  return NextResponse.json({ imported, skipped, errors, tag });
 }
