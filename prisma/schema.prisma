@@ -119,6 +119,7 @@ model EmailDraft {
   id                String      @id @default(cuid())
   contactId         String
   campaignContactId String?
+  replyToThreadId   String?
   subject           String
   body              String      @db.Text
   generationContext  Json?
