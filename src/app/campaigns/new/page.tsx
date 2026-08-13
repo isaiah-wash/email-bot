@@ -40,6 +40,7 @@ export default function NewCampaignPage() {
   const [selectedContacts, setSelectedContacts] = useState<string[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+  const [contactSearch, setContactSearch] = useState("");
 
   useEffect(() => {
     if (status === "unauthenticated") router.replace("/");
@@ -134,6 +135,13 @@ export default function NewCampaignPage() {
     }
     setSaving(false);
   }
+
+  const filteredContacts = contacts.filter((c) => {
+    const q = contactSearch.trim().toLowerCase();
+    if (!q) return true;
+    const name = [c.firstName, c.lastName].filter(Boolean).join(" ").toLowerCase();
+    return (c.email ?? "").toLowerCase().includes(q) || name.includes(q);
+  });
 
   if (status === "loading" || !session) {
     return (
@@ -256,40 +264,53 @@ export default function NewCampaignPage() {
           {contacts.length === 0 ? (
             <p className="text-sm text-zinc-400">No contacts available. Add contacts first.</p>
           ) : (
-            <div className="max-h-64 overflow-y-auto divide-y divide-brand-50">
-              {contacts.map((contact) => (
-                <label
-                  key={contact.id}
-                  className="flex items-center gap-3 px-2 py-2.5 hover:bg-brand-50/50 cursor-pointer"
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedContacts.includes(contact.id)}
-                    onChange={() => toggleContact(contact.id)}
-                    className="rounded border-brand-200 text-brand-500 focus:ring-brand-400"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-sm font-medium">
-                        {[contact.firstName, contact.lastName].filter(Boolean).join(" ") || "Unnamed"}
-                      </span>
-                      {contact.tags.map(({ tag }) => (
-                        <span
-                          key={tag.id}
-                          className="rounded-full px-1.5 py-0.5 text-xs font-medium text-white"
-                          style={{ backgroundColor: tag.color }}
-                        >
-                          {tag.name}
-                        </span>
-                      ))}
-                    </div>
-                    <div className="text-xs text-zinc-500">
-                      {contact.email || "No email"} {contact.company && `· ${contact.company}`}
-                    </div>
-                  </div>
-                </label>
-              ))}
-            </div>
+            <>
+              <input
+                type="text"
+                value={contactSearch}
+                onChange={(e) => setContactSearch(e.target.value)}
+                placeholder="Search by email or name..."
+                className="mb-3 w-full rounded-lg border border-brand-100 px-3 py-2 text-sm focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
+              />
+              {filteredContacts.length === 0 ? (
+                <p className="text-sm text-zinc-400">No contacts match your search.</p>
+              ) : (
+                <div className="max-h-64 overflow-y-auto divide-y divide-brand-50">
+                  {filteredContacts.map((contact) => (
+                    <label
+                      key={contact.id}
+                      className="flex items-center gap-3 px-2 py-2.5 hover:bg-brand-50/50 cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedContacts.includes(contact.id)}
+                        onChange={() => toggleContact(contact.id)}
+                        className="rounded border-brand-200 text-brand-500 focus:ring-brand-400"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-sm font-medium">
+                            {[contact.firstName, contact.lastName].filter(Boolean).join(" ") || "Unnamed"}
+                          </span>
+                          {contact.tags.map(({ tag }) => (
+                            <span
+                              key={tag.id}
+                              className="rounded-full px-1.5 py-0.5 text-xs font-medium text-white"
+                              style={{ backgroundColor: tag.color }}
+                            >
+                              {tag.name}
+                            </span>
+                          ))}
+                        </div>
+                        <div className="text-xs text-zinc-500">
+                          {contact.email || "No email"} {contact.company && `· ${contact.company}`}
+                        </div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </div>
 
