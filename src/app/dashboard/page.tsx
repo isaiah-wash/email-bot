@@ -32,19 +32,12 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!session) return;
 
-    Promise.all([
-      fetch("/api/contacts").then((r) => r.json()),
-      fetch("/api/campaigns").then((r) => r.json()),
-      fetch("/api/drafts").then((r) => r.json()),
-    ]).then(([contacts, campaigns, drafts]) => {
-      setStats({
-        contacts: contacts.length ?? 0,
-        campaigns: campaigns.length ?? 0,
-        drafts: drafts.filter((d: { status: string }) => d.status !== "SENT").length ?? 0,
-        sent: drafts.filter((d: { status: string }) => d.status === "SENT").length ?? 0,
+    fetch("/api/dashboard/stats")
+      .then((r) => r.json())
+      .then(({ stats, recentDrafts }) => {
+        setStats(stats);
+        setRecentDrafts(recentDrafts);
       });
-      setRecentDrafts(drafts.slice(0, 5));
-    });
   }, [session]);
 
   if (status === "loading" || !session) {

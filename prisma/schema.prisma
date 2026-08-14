@@ -98,6 +98,8 @@ model Campaign {
   user     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   template Template?         @relation(fields: [templateId], references: [id])
   contacts CampaignContact[]
+
+  @@index([userId])
 }
 
 model CampaignContact {
@@ -113,6 +115,7 @@ model CampaignContact {
   drafts   EmailDraft[]
 
   @@unique([campaignId, contactId])
+  @@index([contactId])
 }
 
 model EmailDraft {
@@ -131,6 +134,9 @@ model EmailDraft {
   contact         Contact          @relation(fields: [contactId], references: [id], onDelete: Cascade)
   campaignContact CampaignContact? @relation(fields: [campaignContactId], references: [id], onDelete: SetNull)
   sentEmail       SentEmail?
+
+  @@index([contactId])
+  @@index([campaignContactId])
 }
 
 model SentEmail {
@@ -178,6 +184,7 @@ model ContactTag {
   tag       Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   @@id([contactId, tagId])
+  @@index([tagId])
 }
 
 enum CampaignStatus {

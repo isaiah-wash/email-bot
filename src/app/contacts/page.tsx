@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 
+const PAGE_SIZE = 50;
+
 const TAG_COLORS = [
   { label: "Indigo", value: "#6366f1" },
   { label: "Violet", value: "#8b5cf6" },
@@ -149,6 +151,8 @@ export default function ContactsPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [allTags, setAllTags] = useState<Tag[]>([]);
   const [activeTags, setActiveTags] = useState<string[]>([]);
   const [showUntagged, setShowUntagged] = useState(false);
@@ -212,8 +216,7 @@ export default function ContactsPage() {
     if (Array.isArray(data)) setAllTags(data);
   }
 
-  async function fetchContacts(q = "", tagIds: string[] = activeTags, untagged = showUntagged) {
-    setLoading(true);
+  function buildContactsParams(q: string, tagIds: string[], untagged: boolean) {
     const params = new URLSearchParams();
     if (q) params.set("search", q);
     if (untagged) {
@@ -221,10 +224,29 @@ export default function ContactsPage() {
     } else if (tagIds.length > 0) {
       params.set("tagId", tagIds.join(","));
     }
+    return params;
+  }
+
+  async function fetchContacts(
+    q = search,
+    tagIds: string[] = activeTags,
+    untagged = showUntagged,
+    append = false
+  ) {
+    if (append) setLoadingMore(true);
+    else setLoading(true);
+
+    const params = buildContactsParams(q, tagIds, untagged);
+    params.set("limit", String(PAGE_SIZE));
+    params.set("offset", append ? String(contacts.length) : "0");
+
     const res = await fetch(`/api/contacts?${params}`);
     const data = await res.json();
-    setContacts(data);
-    setLoading(false);
+    setContacts((prev) => (append ? [...prev, ...data.contacts] : data.contacts));
+    setTotal(data.total);
+
+    if (append) setLoadingMore(false);
+    else setLoading(false);
   }
 
   function toggleTag(tagId: string) {
@@ -263,15 +285,18 @@ export default function ContactsPage() {
   async function handleTagAll() {
     if (!tagAllId) return;
     setTaggingAll(true);
-    await Promise.all(
-      contacts.map((contact) =>
-        fetch(`/api/contacts/${contact.id}/tags`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ tagId: tagAllId }),
-        })
-      )
-    );
+
+    // Apply to every contact matching the current filters, not just the loaded page
+    const params = buildContactsParams(search, activeTags, showUntagged);
+    params.set("idsOnly", "true");
+    const idsRes = await fetch(`/api/contacts?${params}`);
+    const { ids } = await idsRes.json();
+
+    await fetch(`/api/tags/${tagAllId}/apply`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contactIds: ids }),
+    });
     setTaggingAll(false);
     setShowTagAll(false);
     setTagAllId("");
@@ -489,7 +514,7 @@ export default function ContactsPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Contacts</h1>
-          <p className="mt-1 text-sm text-zinc-500">{contacts.length} contacts in your directory</p>
+          <p className="mt-1 text-sm text-zinc-500">{total} contacts in your directory</p>
         </div>
         <div className="flex items-center gap-2">
           <input
@@ -507,7 +532,7 @@ export default function ContactsPage() {
             {importing ? "Importing..." : "Import CSV"}
           </button>
           {/* Tag All popover */}
-          {allTags.length > 0 && contacts.length > 0 && (
+          {allTags.length > 0 && total > 0 && (
             <div className="relative" ref={tagAllRef}>
               <button
                 onClick={() => {
@@ -521,7 +546,7 @@ export default function ContactsPage() {
               {showTagAll && (
                 <div className="absolute right-0 top-10 z-20 w-60 rounded-xl border border-brand-100 bg-white shadow-lg p-3 space-y-2">
                   <p className="text-xs text-zinc-500">
-                    Apply a tag to all {contacts.length} visible contact{contacts.length !== 1 ? "s" : ""}
+                    Apply a tag to all {total} matching contact{total !== 1 ? "s" : ""}
                   </p>
                   <select
                     value={tagAllId}
@@ -1114,6 +1139,18 @@ export default function ContactsPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {!loading && contacts.length < total && (
+        <div className="mt-4 flex justify-center">
+          <button
+            onClick={() => fetchContacts(search, activeTags, showUntagged, true)}
+            disabled={loadingMore}
+            className="rounded-lg border border-brand-100 bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-brand-50/50 transition-colors disabled:opacity-50"
+          >
+            {loadingMore ? "Loading..." : `Load More (${contacts.length} of ${total})`}
+          </button>
         </div>
       )}
     </div>

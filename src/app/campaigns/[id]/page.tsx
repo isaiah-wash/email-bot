@@ -45,6 +45,8 @@ interface Campaign {
   }[];
 }
 
+const CONTACTS_PAGE_SIZE = 50;
+
 interface Analytics {
   totalContacts: number;
   sent: number;
@@ -114,6 +116,9 @@ export default function CampaignDetailPage() {
 
   const [editingContacts, setEditingContacts] = useState(false);
   const [allContacts, setAllContacts] = useState<ContactOption[]>([]);
+  const [allContactsTotal, setAllContactsTotal] = useState(0);
+  const [loadingContacts, setLoadingContacts] = useState(false);
+  const [loadingMoreContacts, setLoadingMoreContacts] = useState(false);
   const [contactSearch, setContactSearch] = useState("");
   const [selectedContactIds, setSelectedContactIds] = useState<Set<string>>(new Set());
   const [savingContacts, setSavingContacts] = useState(false);
@@ -211,12 +216,37 @@ export default function CampaignDetailPage() {
     }
   }
 
-  async function openEditContacts() {
-    const res = await fetch("/api/contacts");
+  async function fetchAllContactsPage(q: string, append = false) {
+    if (append) setLoadingMoreContacts(true);
+    else setLoadingContacts(true);
+
+    const params = new URLSearchParams();
+    if (q) params.set("search", q);
+    params.set("limit", String(CONTACTS_PAGE_SIZE));
+    params.set("offset", append ? String(allContacts.length) : "0");
+
+    const res = await fetch(`/api/contacts?${params}`);
     if (res.ok) {
-      const contacts = await res.json();
-      setAllContacts(contacts);
+      const data = await res.json();
+      setAllContacts((prev) => (append ? [...prev, ...data.contacts] : data.contacts));
+      setAllContactsTotal(data.total);
     }
+
+    if (append) setLoadingMoreContacts(false);
+    else setLoadingContacts(false);
+  }
+
+  // Debounced live search against the server while the picker is open
+  useEffect(() => {
+    if (!editingContacts) return;
+    const t = setTimeout(() => {
+      fetchAllContactsPage(contactSearch.trim());
+    }, 300);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contactSearch, editingContacts]);
+
+  function openEditContacts() {
     const currentIds = new Set(campaign!.contacts.map((cc) => cc.contact.id));
     setSelectedContactIds(currentIds);
     setContactSearch("");
@@ -434,44 +464,55 @@ export default function CampaignDetailPage() {
                   className="w-full rounded-lg border border-brand-100 px-3 py-2 text-sm focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
                 />
                 <div className="max-h-[32rem] overflow-y-auto divide-y divide-brand-50 rounded-lg border border-brand-100">
-                  {allContacts
-                    .filter((c) => {
-                      const q = contactSearch.toLowerCase();
-                      return (
-                        !q ||
-                        (c.firstName ?? "").toLowerCase().includes(q) ||
-                        (c.lastName ?? "").toLowerCase().includes(q) ||
-                        (c.email ?? "").toLowerCase().includes(q) ||
-                        (c.company ?? "").toLowerCase().includes(q)
-                      );
-                    })
-                    .map((c) => {
-                      const name = [c.firstName, c.lastName].filter(Boolean).join(" ") || "Unnamed";
-                      const checked = selectedContactIds.has(c.id);
-                      return (
-                        <label key={c.id} className="flex items-center gap-3 px-3 py-2.5 hover:bg-brand-50/50 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={() => {
-                              setSelectedContactIds((prev) => {
-                                const next = new Set(prev);
-                                if (next.has(c.id)) next.delete(c.id);
-                                else next.add(c.id);
-                                return next;
-                              });
-                            }}
-                            className="rounded border-brand-200 text-brand-500 focus:ring-brand-400"
-                          />
-                          <div className="min-w-0">
-                            <div className="text-sm font-medium truncate">{name}</div>
-                            <div className="text-xs text-zinc-400 truncate">
-                              {c.email || "No email"}{c.company && ` · ${c.company}`}
+                  {loadingContacts ? (
+                    <p className="px-3 py-4 text-sm text-zinc-400">Loading contacts...</p>
+                  ) : allContacts.length === 0 ? (
+                    <p className="px-3 py-4 text-sm text-zinc-400">
+                      {contactSearch.trim() ? "No contacts match your search." : "No contacts available."}
+                    </p>
+                  ) : (
+                    <>
+                      {allContacts.map((c) => {
+                        const name = [c.firstName, c.lastName].filter(Boolean).join(" ") || "Unnamed";
+                        const checked = selectedContactIds.has(c.id);
+                        return (
+                          <label key={c.id} className="flex items-center gap-3 px-3 py-2.5 hover:bg-brand-50/50 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => {
+                                setSelectedContactIds((prev) => {
+                                  const next = new Set(prev);
+                                  if (next.has(c.id)) next.delete(c.id);
+                                  else next.add(c.id);
+                                  return next;
+                                });
+                              }}
+                              className="rounded border-brand-200 text-brand-500 focus:ring-brand-400"
+                            />
+                            <div className="min-w-0">
+                              <div className="text-sm font-medium truncate">{name}</div>
+                              <div className="text-xs text-zinc-400 truncate">
+                                {c.email || "No email"}{c.company && ` · ${c.company}`}
+                              </div>
                             </div>
-                          </div>
-                        </label>
-                      );
-                    })}
+                          </label>
+                        );
+                      })}
+                      {allContacts.length < allContactsTotal && (
+                        <button
+                          type="button"
+                          onClick={() => fetchAllContactsPage(contactSearch.trim(), true)}
+                          disabled={loadingMoreContacts}
+                          className="w-full py-2 text-xs font-medium text-zinc-600 hover:bg-brand-50/50 disabled:opacity-50"
+                        >
+                          {loadingMoreContacts
+                            ? "Loading..."
+                            : `Load More (${allContacts.length} of ${allContactsTotal})`}
+                        </button>
+                      )}
+                    </>
+                  )}
                 </div>
                 <div className="flex items-center justify-between pt-1">
                   <span className="text-xs text-zinc-400">{selectedContactIds.size} selected</span>

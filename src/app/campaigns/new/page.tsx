@@ -24,6 +24,8 @@ interface Template {
   name: string;
 }
 
+const PAGE_SIZE = 50;
+
 export default function NewCampaignPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -35,10 +37,16 @@ export default function NewCampaignPage() {
     useAi: true,
   });
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [contactsTotal, setContactsTotal] = useState(0);
+  const [loadingContacts, setLoadingContacts] = useState(true);
+  const [loadingMoreContacts, setLoadingMoreContacts] = useState(false);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [allTags, setAllTags] = useState<Tag[]>([]);
   const [selectedContacts, setSelectedContacts] = useState<string[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  // Which contact ids came from which active tag, so untoggling a tag can
+  // remove exactly those contacts without needing every contact loaded locally
+  const [tagContactIds, setTagContactIds] = useState<Record<string, string[]>>({});
   const [saving, setSaving] = useState(false);
   const [contactSearch, setContactSearch] = useState("");
 
@@ -48,10 +56,37 @@ export default function NewCampaignPage() {
 
   useEffect(() => {
     if (!session) return;
-    fetch("/api/contacts").then((r) => r.json()).then(setContacts);
     fetch("/api/templates").then((r) => r.json()).then(setTemplates);
     fetch("/api/tags").then((r) => r.json()).then(setAllTags);
   }, [session]);
+
+  async function fetchContacts(q: string, append = false) {
+    if (append) setLoadingMoreContacts(true);
+    else setLoadingContacts(true);
+
+    const params = new URLSearchParams();
+    if (q) params.set("search", q);
+    params.set("limit", String(PAGE_SIZE));
+    params.set("offset", append ? String(contacts.length) : "0");
+
+    const res = await fetch(`/api/contacts?${params}`);
+    const data = await res.json();
+    setContacts((prev) => (append ? [...prev, ...data.contacts] : data.contacts));
+    setContactsTotal(data.total);
+
+    if (append) setLoadingMoreContacts(false);
+    else setLoadingContacts(false);
+  }
+
+  // Debounced live search against the server — resets to page 1 on every change
+  useEffect(() => {
+    if (!session) return;
+    const t = setTimeout(() => {
+      fetchContacts(contactSearch.trim());
+    }, 300);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contactSearch, session]);
 
   function toggleContact(id: string) {
     setSelectedContacts((prev) =>
@@ -59,62 +94,51 @@ export default function NewCampaignPage() {
     );
   }
 
-  function handleSelectAll() {
-    if (selectedContacts.length === contacts.length && contacts.length > 0) {
-      setSelectedContacts([]);
-    } else {
-      setSelectedContacts(contacts.map((c) => c.id));
-    }
+  async function handleSelectAll() {
+    const params = new URLSearchParams({ idsOnly: "true" });
+    if (contactSearch.trim()) params.set("search", contactSearch.trim());
+    const res = await fetch(`/api/contacts?${params}`);
+    const { ids } = await res.json();
+    setSelectedContacts((prev) => Array.from(new Set([...prev, ...ids])));
+  }
+
+  function handleClearSelection() {
+    setSelectedContacts([]);
+    setSelectedTags([]);
+    setTagContactIds({});
   }
 
   async function handleTagToggle(tagId: string) {
     const isActive = selectedTags.includes(tagId);
 
     if (!isActive) {
-      // Tag toggled ON: fetch contacts for this tag and merge into selectedContacts
+      // Tag toggled ON: fetch every contact id for this tag and merge into selectedContacts
       setSelectedTags((prev) => [...prev, tagId]);
-      const res = await fetch(`/api/contacts?tagId=${tagId}`);
+      const res = await fetch(`/api/contacts?tagId=${tagId}&idsOnly=true`);
       if (res.ok) {
-        const tagContacts: Contact[] = await res.json();
-        const newIds = tagContacts.map((c) => c.id);
-        setSelectedContacts((prev) => {
-          const merged = new Set([...prev, ...newIds]);
-          return Array.from(merged);
-        });
+        const { ids } = await res.json();
+        setTagContactIds((prev) => ({ ...prev, [tagId]: ids }));
+        setSelectedContacts((prev) => Array.from(new Set([...prev, ...ids])));
       }
     } else {
       // Tag toggled OFF: remove contacts that are ONLY covered by this tag
       const remainingTags = selectedTags.filter((id) => id !== tagId);
       setSelectedTags(remainingTags);
 
-      if (remainingTags.length === 0) {
-        // No other tags active — remove all tag-sourced contacts (keep manually checked ones)
-        // We don't know which were manually checked vs tag-sourced, so keep all currently selected
-        // but remove contacts that have this tag and no other selected tags
-        setSelectedContacts((prev) =>
-          prev.filter((contactId) => {
-            const contact = contacts.find((c) => c.id === contactId);
-            if (!contact) return true;
-            const contactTagIds = contact.tags.map((ct) => ct.tag.id);
-            // Keep if it doesn't have the removed tag
-            return !contactTagIds.includes(tagId);
-          })
-        );
-      } else {
-        // Other tags still active — only remove contacts that had this tag but none of the remaining active tags
-        setSelectedContacts((prev) =>
-          prev.filter((contactId) => {
-            const contact = contacts.find((c) => c.id === contactId);
-            if (!contact) return true;
-            const contactTagIds = contact.tags.map((ct) => ct.tag.id);
-            // If contact has the removed tag but not any remaining active tag, remove it
-            const hadRemovedTag = contactTagIds.includes(tagId);
-            if (!hadRemovedTag) return true; // didn't come from this tag, keep
-            const coveredByOtherTag = remainingTags.some((t) => contactTagIds.includes(t));
-            return coveredByOtherTag;
-          })
-        );
-      }
+      const removedIds = tagContactIds[tagId] ?? [];
+      setTagContactIds((prev) => {
+        const next = { ...prev };
+        delete next[tagId];
+        return next;
+      });
+
+      setSelectedContacts((prev) =>
+        prev.filter((contactId) => {
+          if (!removedIds.includes(contactId)) return true; // didn't come from this tag, keep
+          // Came from this tag — keep only if another still-active tag also covers it
+          return remainingTags.some((t) => (tagContactIds[t] ?? []).includes(contactId));
+        })
+      );
     }
   }
 
@@ -135,13 +159,6 @@ export default function NewCampaignPage() {
     }
     setSaving(false);
   }
-
-  const filteredContacts = contacts.filter((c) => {
-    const q = contactSearch.trim().toLowerCase();
-    if (!q) return true;
-    const name = [c.firstName, c.lastName].filter(Boolean).join(" ").toLowerCase();
-    return (c.email ?? "").toLowerCase().includes(q) || name.includes(q);
-  });
 
   if (status === "loading" || !session) {
     return (
@@ -249,66 +266,85 @@ export default function NewCampaignPage() {
         <div className="rounded-xl border border-brand-100 bg-white p-6">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-semibold">Select Contacts ({selectedContacts.length} selected)</h2>
-            {contacts.length > 0 && (
-              <button
-                type="button"
-                onClick={handleSelectAll}
-                className="text-xs font-medium text-brand-500 hover:text-brand-600"
-              >
-                {selectedContacts.length === contacts.length && contacts.length > 0
-                  ? "Deselect All"
-                  : "Select All"}
-              </button>
-            )}
+            <div className="flex items-center gap-3">
+              {contactsTotal > 0 && (
+                <button
+                  type="button"
+                  onClick={handleSelectAll}
+                  className="text-xs font-medium text-brand-500 hover:text-brand-600"
+                >
+                  Select All{contactSearch.trim() ? " Matching" : ""}
+                </button>
+              )}
+              {selectedContacts.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleClearSelection}
+                  className="text-xs font-medium text-zinc-400 hover:text-zinc-600"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
           </div>
-          {contacts.length === 0 ? (
-            <p className="text-sm text-zinc-400">No contacts available. Add contacts first.</p>
+          <input
+            type="text"
+            value={contactSearch}
+            onChange={(e) => setContactSearch(e.target.value)}
+            placeholder="Search by email or name..."
+            className="mb-3 w-full rounded-lg border border-brand-100 px-3 py-2 text-sm focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
+          />
+          {loadingContacts ? (
+            <p className="text-sm text-zinc-400">Loading contacts...</p>
+          ) : contacts.length === 0 ? (
+            <p className="text-sm text-zinc-400">
+              {contactSearch.trim() ? "No contacts match your search." : "No contacts available. Add contacts first."}
+            </p>
           ) : (
             <>
-              <input
-                type="text"
-                value={contactSearch}
-                onChange={(e) => setContactSearch(e.target.value)}
-                placeholder="Search by email or name..."
-                className="mb-3 w-full rounded-lg border border-brand-100 px-3 py-2 text-sm focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-400"
-              />
-              {filteredContacts.length === 0 ? (
-                <p className="text-sm text-zinc-400">No contacts match your search.</p>
-              ) : (
-                <div className="max-h-64 overflow-y-auto divide-y divide-brand-50">
-                  {filteredContacts.map((contact) => (
-                    <label
-                      key={contact.id}
-                      className="flex items-center gap-3 px-2 py-2.5 hover:bg-brand-50/50 cursor-pointer"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedContacts.includes(contact.id)}
-                        onChange={() => toggleContact(contact.id)}
-                        className="rounded border-brand-200 text-brand-500 focus:ring-brand-400"
-                      />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="text-sm font-medium">
-                            {[contact.firstName, contact.lastName].filter(Boolean).join(" ") || "Unnamed"}
+              <div className="max-h-64 overflow-y-auto divide-y divide-brand-50">
+                {contacts.map((contact) => (
+                  <label
+                    key={contact.id}
+                    className="flex items-center gap-3 px-2 py-2.5 hover:bg-brand-50/50 cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedContacts.includes(contact.id)}
+                      onChange={() => toggleContact(contact.id)}
+                      className="rounded border-brand-200 text-brand-500 focus:ring-brand-400"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-sm font-medium">
+                          {[contact.firstName, contact.lastName].filter(Boolean).join(" ") || "Unnamed"}
+                        </span>
+                        {contact.tags.map(({ tag }) => (
+                          <span
+                            key={tag.id}
+                            className="rounded-full px-1.5 py-0.5 text-xs font-medium text-white"
+                            style={{ backgroundColor: tag.color }}
+                          >
+                            {tag.name}
                           </span>
-                          {contact.tags.map(({ tag }) => (
-                            <span
-                              key={tag.id}
-                              className="rounded-full px-1.5 py-0.5 text-xs font-medium text-white"
-                              style={{ backgroundColor: tag.color }}
-                            >
-                              {tag.name}
-                            </span>
-                          ))}
-                        </div>
-                        <div className="text-xs text-zinc-500">
-                          {contact.email || "No email"} {contact.company && `· ${contact.company}`}
-                        </div>
+                        ))}
                       </div>
-                    </label>
-                  ))}
-                </div>
+                      <div className="text-xs text-zinc-500">
+                        {contact.email || "No email"} {contact.company && `· ${contact.company}`}
+                      </div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+              {contacts.length < contactsTotal && (
+                <button
+                  type="button"
+                  onClick={() => fetchContacts(contactSearch.trim(), true)}
+                  disabled={loadingMoreContacts}
+                  className="mt-3 w-full rounded-lg border border-brand-100 py-1.5 text-xs font-medium text-zinc-600 hover:bg-brand-50/50 disabled:opacity-50"
+                >
+                  {loadingMoreContacts ? "Loading..." : `Load More (${contacts.length} of ${contactsTotal})`}
+                </button>
               )}
             </>
           )}

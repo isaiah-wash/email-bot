@@ -37,16 +37,37 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const contacts = await prisma.contact.findMany({
-    where,
-    orderBy: { createdAt: "desc" },
-    include: {
-      _count: { select: { emailDrafts: true } },
-      tags: { include: { tag: true } },
-    },
-  });
+  // Lightweight path for bulk operations (select all, tag all) that only need
+  // matching contact ids, not the full row with tags/counts included.
+  if (req.nextUrl.searchParams.get("idsOnly") === "true") {
+    const ids = await prisma.contact.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      select: { id: true },
+    });
+    return NextResponse.json({ ids: ids.map((c) => c.id) });
+  }
 
-  return NextResponse.json(contacts);
+  const limitParam = req.nextUrl.searchParams.get("limit");
+  const offsetParam = req.nextUrl.searchParams.get("offset");
+  const limit = Math.min(Math.max(parseInt(limitParam ?? "50", 10) || 50, 1), 200);
+  const offset = Math.max(parseInt(offsetParam ?? "0", 10) || 0, 0);
+
+  const [contacts, total] = await Promise.all([
+    prisma.contact.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip: offset,
+      take: limit,
+      include: {
+        _count: { select: { emailDrafts: true } },
+        tags: { include: { tag: true } },
+      },
+    }),
+    prisma.contact.count({ where }),
+  ]);
+
+  return NextResponse.json({ contacts, total });
 }
 
 export async function POST(req: NextRequest) {
